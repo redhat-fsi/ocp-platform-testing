@@ -5,7 +5,9 @@ Based off of [this repo](https://github.com/openshift/verification-tests/tree/ma
 # Instructions
 
 1. Run `build-container.sh`
+  * By default, the 4.15 `oc` client is used in the container
 2. Run `run-container.sh`.
+  * Make sure to fill out the various environment variables in the script
   * Args can be passed like `run-container.sh features/cli/create.feature`
   * No args will run all tests
 
