@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  labels:
+    app: readiness-test
+    component: mongodb
+spec:
+  replicas: 1
+  serviceName: mongodb
+  selector:
+    matchLabels:
+      app: readiness-test
+      component: mongodb
+  template:
+    metadata:
+      labels:
+        app: readiness-test
+        component: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: {{ mongodb_image }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --bind_ip_all
+            - --dbpath
+            - /data/db
+          env:
+            - name: MONGODB_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-root-username
+            - name: MONGODB_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-root-password
+          ports:
+            - containerPort: 27017
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /data/db
+              name: mongodb-data
+            - mountPath: /var/run/secrets/mongodb
+              name: mongodb-secret
+      volumes:
+        - name: mongodb-secret
+          secret:
+            secretName: mongodb-secret
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        storageClassName: {{ ar_default_storage_classes[0] }}
+        resources:
+          requests:
+            storage: 1Gi
+...

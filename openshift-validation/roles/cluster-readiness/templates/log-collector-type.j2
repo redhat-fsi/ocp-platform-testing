@@ -1,0 +1,13 @@
+{%- set collection_type = 'invalid' -%}
+{%- set collection_attr = {} -%}
+{%- if _instance.spec.collection is defined -%}
+  {%- if _instance.spec.collection.type is defined -%}
+    {%- set collection_type = _instance.spec.collection.type -%}
+  {%- else -%}
+    {%- if _instance.spec.collection.logs is defined and _instance.spec.collection.logs.type is defined -%}
+      {%- set collection_type = _instance.spec.collection.logs.type -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+
+{{ collection_type }}

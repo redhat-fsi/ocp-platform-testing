@@ -1,0 +1,13 @@
+---
+- name: use namegen api to get the random names generated
+  register: ar_random_names
+  ansible.builtin.uri:
+    url: "http://{{ ar_get_route_result.resources[0].spec.host }}/api/names"
+    method: GET
+    headers:
+      Accept: application/json
+
+- name: save random names
+  ansible.builtin.set_fact:
+    "{{ _var_name }}": "{{ ar_random_names.json if ar_random_names.json is defined else [] }}"
+...

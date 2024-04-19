@@ -1,0 +1,47 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stateless-deny-all
+  labels:
+    app: readiness-test
+    component: stateless-app
+spec:
+  podSelector:
+    matchLabels:
+      app: readiness-test
+      component: stateless-app
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-kubernetes-api
+  labels:
+    app: readiness-test
+    component: stateless-app
+spec:
+  podSelector:
+    matchLabels:
+      app: readiness-test
+      component: stateless-app
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+{% for ip in _kubernetes_ips %}
+        - ipBlock:
+            cidr: {{ ip }}/32
+{% endfor %}
+      ports:
+{% for port in _kubernetes_ports %}
+        - port: {{ port }}
+          protocol: TCP
+{% endfor %}
+...

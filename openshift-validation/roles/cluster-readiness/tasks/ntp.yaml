@@ -1,0 +1,42 @@
+---
+- name: initialize variables
+  ansible.builtin.set_fact:
+    cr_ntp_no_sync_nodes: []
+
+- name: get nodes
+  register: cr_node_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ kubeconfig_file }}"
+
+# using 'oc debug' directly is not ideal; need research for alternate method
+- name: get ntp status
+  register: cr_ntp_status
+  loop: "{{ cr_node_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_file }}"
+  ansible.builtin.command: |
+    oc -n {{ cr_working_namespace }} debug node/{{ item.metadata.name }} -- \
+      chroot /host
+      timedatectl show --all
+
+- name: parse ntp status
+  vars:
+    _nodename: "{{ item.item.metadata.name }}"
+  loop: "{{ cr_ntp_status.results }}"
+  loop_control:
+    label: "{{ _nodename }}"
+  when: "(item.stdout_lines is not contains('NTP=yes') or
+          item.stdout_lines is not contains('NTPSynchronized=yes'))"
+  ansible.builtin.set_fact:
+    cr_ntp_no_sync_nodes: "{{ cr_ntp_no_sync_nodes + [_nodename] }}"
+
+- name: report if ntp is synchronized on any nodes
+  when: (cr_ntp_no_sync_nodes | length) != 0
+  vars:
+    _new_result: "ntp is not synchronized for the following nodes: {{ cr_ntp_no_sync_nodes | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

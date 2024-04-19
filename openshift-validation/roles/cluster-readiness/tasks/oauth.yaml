@@ -1,0 +1,64 @@
+---
+- name: initialize variables
+  ansible.builtin.set_fact:
+    cr_token_max_age: 0
+    cr_token_inactivity_timeout: 0
+
+- name: get OAuth
+  register: cr_get_oauth_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: OAuth
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: get accessTokenMaxAgeSeconds
+  when:
+    - cr_get_oauth_result.resources[0].spec.tokenConfig is defined
+    - cr_get_oauth_result.resources[0].spec.tokenConfig.accessTokenMaxAgeSeconds is defined
+  ansible.builtin.set_fact:
+    cr_token_max_age: "{{ cr_get_oauth_result.resources[0].spec.tokenConfig.accessTokenMaxAgeSeconds }}"
+
+- name: get accessTokenInactivityTimeout
+  when:
+    - cr_get_oauth_result.resources[0].spec.tokenConfig is defined
+    - cr_get_oauth_result.resources[0].spec.tokenConfig.accessTokenInactivityTimeout is defined
+  ansible.builtin.set_fact:
+    cr_token_inactivity_timeout: "{{ cr_get_oauth_result.resources[0].spec.tokenConfig.accessTokenInactivityTimeout |
+                                     regex_replace('([dhms])', '\\1 ') | community.general.to_seconds }}"
+
+- name: report if oauth accessTokenMaxAgeSeconds not configured or less than {{ min_access_token_max_age_seconds }}
+  when: cr_token_max_age | int  < min_access_token_max_age_seconds
+  vars:
+    _new_result: "oauth accessTokenMaxAgeSeconds not configured or less than {{ min_access_token_max_age_seconds }}s"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: report if oauth accessTokenInactivityTimeout not configured or less than {{ min_access_token_inactivity_timeout }}
+  when: cr_token_inactivity_timeout | int < min_access_token_inactivity_timeout
+  vars:
+    _new_result: "oauth accessTokenInactivityTimeout not configured or less than {{ min_access_token_inactivity_timeout }}s"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: report if no identity provider configured
+  when: cr_get_oauth_result.resources[0].spec.identityProviders | length < 1
+  vars:
+    _new_result: "oauth identity provider not configured"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: check if ldap identity provider is configured
+  ansible.builtin.set_fact:
+    cr_ldap_idp: "{{ cr_get_oauth_result.resources[0].spec.identityProviders | selectattr('type', '==', 'LDAP') }}"
+
+- name: report if ldap identity provider used insecure connection
+  when: cr_ldap_idp | selectattr('ldap.insecure', '==', true) | length > 0
+  vars:
+    _new_result: "one or more ldap identity providers used insecure connection"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: report if console login banner not defined
+  when:
+    - cr_get_oauth_result.resources[0].spec.templates is not defined
+    - cr_get_oauth_result.resources[0].spec.templates.login is not defined
+  vars:
+    _new_result: "console login banner not defined"
+  ansible.builtin.include_tasks: store-result.yaml
+...

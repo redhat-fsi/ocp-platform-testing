@@ -1,0 +1,37 @@
+---
+min_access_token_max_age_seconds: 600         # in seconds
+min_access_token_inactivity_timeout: 600      # in seconds
+
+etc_encryption_type: aesgcm
+
+forbidden_tls_security_profile:
+  - VersionTLS10
+  - VersionTLS11
+
+acceptable_audit_profiles:
+  - WriteRequestBodies
+  - AllRequestBodies
+
+project_template_objects:
+  - Project
+  - LimitRange
+  - ResourceQuota
+  - NetworkPolicy
+
+disable_default_catalog_sources:
+  - community-operators
+
+openshift_logging_namespace: openshift-logging
+
+allowed_registries:
+  - quay.io
+  - registry.redhat.io
+  - registry.access.redhat.com
+  - image-registry.openshift-image-registry.svc:5000
+
+forbidden_ns:
+  - default
+  - openshift
+
+pod_too_many_restarts: 100
+...

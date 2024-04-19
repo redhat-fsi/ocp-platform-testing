@@ -1,0 +1,10 @@
+---
+cc_namespace_prefix: cluster-capacity-test-
+cc_service_account: cluster-capacity-sa
+cc_configmap: cluster-capacity-configmap
+cc_image: "registry.redhat.io/openshift4/ose-cluster-capacity"
+cc_job: cluster-capacity-job
+
+cc_cpu: 500m
+cc_memory: 128Mi
+...

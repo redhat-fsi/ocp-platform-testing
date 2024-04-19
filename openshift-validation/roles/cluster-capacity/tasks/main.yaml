@@ -1,0 +1,72 @@
+- name: initialize variables
+  ansible.builtin.set_fact:
+    cc_capacity_result: {}
+    cc_namespace: "{{ cc_namespace_prefix }}{{ lookup('password', '/dev/null chars=ascii_letters, length=5') | lower }}"
+
+- name: block with always
+  block:
+    - name: set resources to create
+      ansible.builtin.set_fact:
+        cc_templates:
+          - namespace.yaml.j2
+          - rbac.yaml.j2
+          - configmap.yaml.j2
+          - job.yaml.j2
+
+    - name: create resources
+      loop: "{{ cc_templates }}"
+      kubernetes.core.k8s:
+        resource_definition: "{{ lookup('ansible.builtin.template', item) }}"
+        namespace: "{{ cc_namespace }}"
+        state: present
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: wait for job to complete
+      register: cc_job_result
+      until:
+        - cc_job_result.resources                      # just in case
+        - cc_job_result.resources[0].status is defined
+        - cc_job_result.resources[0].status.succeeded is defined
+        - cc_job_result.resources[0].status.succeeded != 0
+      delay: 5
+      retries: 10
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "{{ cc_job }}"
+        namespace: "{{ cc_namespace }}"
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: retrieve cluster capacity logs
+      register: cc_log_result
+      kubernetes.core.k8s_log:
+        api_version: batch/v1
+        kind: Job
+        name: "{{ cc_job }}"
+        namespace: "{{ cc_namespace }}"
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: parse job log
+      ansible.builtin.set_fact:
+        cc_job_log: "{{ (cc_log_result.log | from_json) if 'Failed' not in cc_log_result.log else cc_log_result.log }}"
+
+    - name: store cluster capacity test result
+      ansible.builtin.set_fact:
+        cc_capacity_result:
+          podRequirements: "{{ cc_job_log.spec.podRequirements if cc_job_log.spec is defined else omit }}"
+          capacityEstimate: "{{ cc_job_log.status if cc_job_log.status is defined else omit }}"
+          error: "{{ cc_job_log if cc_job_log.status is not defined else omit }}"
+
+  always:
+    - name: delete resources
+      loop: "{{ cc_templates | reverse }}"
+      kubernetes.core.k8s:
+        resource_definition: "{{ lookup('ansible.builtin.template', item) }}"
+        namespace: "{{ cc_namespace }}"
+        state: absent
+        wait: true
+        kubeconfig: "{{ kubeconfig_file }}"
+
+- name: display cluster capacity estimation
+  ansible.builtin.debug:
+    msg: "{{ cc_capacity_result }}"

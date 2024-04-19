@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ cc_configmap }}
+data:
+  pod.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      labels:
+        app: test
+        tier: frontend
+      name: small-pod
+      namespace: {{ cc_namespace }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: php-redis
+          image: "gcr.io/google-samples/gb-frontend:v4"
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: {{ cc_cpu }}
+              memory: {{ cc_memory }}
+            requests:
+              cpu: {{ cc_cpu }}
+              memory: {{ cc_memory }}
+          securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: [ALL]
+...

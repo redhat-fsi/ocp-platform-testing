@@ -1,0 +1,39 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stateless-app
+  labels:
+    app: readiness-test
+    component: stateless-app
+spec:
+  completions: 1
+  template:
+    metadata:
+      labels:
+        app: readiness-test
+        component: stateless-app
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: openshift-tools
+          image: {{ openshift_tools_image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - |
+              /opt/job/script.sh > /tmp/results.txt
+              diff -q /tmp/results.txt /opt/job/expectetd-results.txt
+              echo -n $?
+          volumeMounts:
+            - mountPath: /opt/job
+              name: job-data
+      serviceAccountName: stateless-app
+      volumes:
+        - name: job-data
+          configMap:
+            name: job-data
+            defaultMode: 504
+...

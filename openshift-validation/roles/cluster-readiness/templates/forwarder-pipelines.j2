@@ -1,0 +1,12 @@
+{%- set _pipelines = [] -%}
+{%- for forwarder in _forwarders -%}
+  {%- if forwarder.spec.pipelines is defined -%}
+    {%- for pipeline in forwarder.spec.pipelines -%}
+      {%- if pipeline.outputRefs != ["default"] -%}
+        {{ _pipelines.append({forwarder.metadata.name: pipeline}) }}
+      {%- endif %}
+    {%- endfor %}
+  {%- endif %}
+{%- endfor %}
+
+{{ _pipelines | to_yaml }}

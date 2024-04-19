@@ -1,0 +1,11 @@
+{%- set not_succeeded = [] -%}
+{%- for csv in _all_csv -%}
+  {%- if csv.status.phase is not defined -%}
+    {%- set _ = not_succeeded.append(csv.metadata.namespace + '/' + csv.metadata.name) -%}
+  {%- else -%}
+    {%- if csv.status.phase != 'Succeeded' -%}
+      {%- set _ = not_succeeded.append(csv.metadata.namespace + '/' + csv.metadata.name) -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{{ not_succeeded | to_json }}

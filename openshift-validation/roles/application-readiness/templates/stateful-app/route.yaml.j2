@@ -1,0 +1,34 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: readiness-test
+    component: namegen
+  name: namegen
+spec:
+  port:
+    targetPort: namegen
+  to:
+    kind: Service
+    name: namegen
+    weight: 100
+
+{% if deploy_mongo_express | bool %}
+---
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mongo-express
+  labels:
+    app: readiness-test
+    component: mongo-express
+spec:
+  to:
+    kind: Service
+    name: mongo-express
+  port:
+    targetPort: mongo-express
+{% endif %}
+...

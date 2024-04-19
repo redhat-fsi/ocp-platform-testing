@@ -1,0 +1,64 @@
+= Overview
+
+Use the steps below to build an Ansible execution environment container image; the execution environment container image will have all the dependencies required to run the playbooks in this repository.
+
+== Build Execution Environment Image
+
+The link:ansible.conf[ansible.cfg] file is configured to use link:https://console.redhat.com/ansible/automation-hub[Red Hat Automation Hub], which requires authentication. The `token` directive in the link:ansible.conf[ansible.cfg] file is purposely set with dummy value so as not to accidentally leak the secret to git repository, or to the resulted container image content, metadata, or history. The API token for Red Hat Automation Hub is to be provided to the build environment via a file mounted to the build container.
+
+. Set API token for Red Hat Automation Hub:
++
+[source,bash]
+----
+# prompt for api token
+read -s -p "Red Hat Automation Hub token: " TOKEN
+
+echo -n ${TOKEN} > ~/automation-hub-token
+
+unset TOKEN
+----
+
+. Create build context
++
+[source,bash]
+----
+ansible-builder create
+----
++
+NOTE: The content of the `context` directory is not track by git.
+
+. Build image
++
+[source,bash]
+----
+podman build \
+  --file context/Containerfile \
+  --tag quay.io/bkhoo/ee-openshift-validation:1.0 \
+  --volume ~/automation-hub-token:/var/run/secrets/automation-hub-token:z \
+  context
+
+# remove the token file, not required after image is built
+rm -f ~/automation-hub-token
+----
++
+[NOTE]
+====
+- You are not allowed to publicly distribute container images that you build on top of the automation execution environment images that Red Hat provides with Red Hat Ansible Automation Platform.
+- To distribute your images on a public platform, such as Quay.io, use the public `registry.access.redhat.com/ubi9` base image instead.
+====
+
+. Login to image registry, the user must have write permission for the registry:
++
+[source,bash]
+----
+podman login -u username quay.io
+----
+
+. Push image
++
+[source,bash]
+----
+podman push quay.io/bkhoo/ee-openshift-validation:1.0
+----
++
+NOTE: Do not use `ansible-builder build` command to build the image as it does not has option to mount volume.

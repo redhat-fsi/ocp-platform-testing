@@ -1,0 +1,34 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ cc_job }}
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    metadata:
+      name: cluster-capacity-pod
+    spec:
+      containers:
+        - name: cluster-capacity
+          image: "{{ cc_image }}"
+          imagePullPolicy: Always
+          env:
+            - name: CC_INCLUSTER
+              value: "true"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              /bin/cluster-capacity --podspec=/test-pod/pod.yaml -o json
+          volumeMounts:
+            - mountPath: /test-pod
+              name: test-volume
+      restartPolicy: Never
+      serviceAccountName: {{ cc_service_account }}
+      volumes:
+        - name: test-volume
+          configMap:
+            name: {{ cc_configmap }}
+...

@@ -1,0 +1,86 @@
+---
+- name: block with always
+  block:
+    - name: get kubernetes service
+      register: ar_k8s_service_result
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: kubernetes
+        namespace: default
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: get kubernetes endpoint
+      register: ar_k8s_endpoint_result
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Endpoints       # note: this kind is plural, most others are singular
+        name: kubernetes
+        namespace: default
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: set resources to create
+      ansible.builtin.set_fact:
+        ar_templates:
+          - stateless-with-rbac-app/network-policy.yaml.j2
+          - stateless-with-rbac-app/configmap.yaml.j2
+          - stateless-with-rbac-app/service-account.yaml.j2
+          - stateless-with-rbac-app/rbac.yaml.j2
+          - stateless-with-rbac-app/job.yaml.j2
+
+    - name: create resources
+      vars:
+        _kubernetes_ips: "{{ [ar_k8s_service_result.resources[0].spec.clusterIP] +
+                             ar_k8s_endpoint_result.resources[0].subsets[0].addresses | map(attribute='ip') }}"
+        _kubernetes_ports: "{{ [ar_k8s_service_result.resources[0].spec.ports[0].port] +
+                               ar_k8s_endpoint_result.resources[0].subsets[0].ports | map(attribute='port') }}"
+      loop: "{{ ar_templates }}"
+      kubernetes.core.k8s:
+        resource_definition: "{{ lookup('ansible.builtin.template', item) }}"
+        namespace: "{{ ar_app_namespace }}"
+        state: present
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: wait for job to complete
+      register: ar_job_result
+      until:
+        - ar_job_result.resources                      # just in case
+        - ar_job_result.resources[0].status is defined
+        - ar_job_result.resources[0].status.succeeded is defined
+      delay: 3
+      retries: 18
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: stateless-app
+        namespace: "{{ ar_app_namespace }}"
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: retrieve test logs
+      register: ar_log_result
+      kubernetes.core.k8s_log:
+        api_version: batch/v1
+        kind: Job
+        name: stateless-app
+        namespace: "{{ ar_app_namespace }}"
+        kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: assert passed or failed
+      ansible.builtin.assert:
+        that: ar_log_result.log == "0"
+        success_msg: "stateless application with rbac working as expected"
+        fail_msg: "stateless application with rbac not working as expected"
+
+  always:
+    - name: delete resources
+      when: delete_resources | bool
+      vars:
+        _kubernetes_ips: []
+        _kubernetes_ports: []
+      loop: "{{ ar_templates | reverse }}"
+      kubernetes.core.k8s:
+        resource_definition: "{{ lookup('ansible.builtin.template', item) }}"
+        namespace: "{{ ar_app_namespace }}"
+        state: absent
+        kubeconfig: "{{ kubeconfig_file }}"
+...

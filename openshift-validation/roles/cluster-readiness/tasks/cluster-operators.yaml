@@ -1,0 +1,28 @@
+---
+- name: initialize variables
+  ansible.builtin.set_fact:
+    cr_bad_co: []
+
+- name: get ClusterOperator
+  register: cr_get_co_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: ClusterOperator
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: parse ClusterOperators
+  loop: "{{ cr_get_co_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: ((item.status.conditions | selectattr('type', '==', 'Available'))[0].status != "True" or
+         (item.status.conditions | selectattr('type', '==', 'Progressing'))[0].status != "False" or
+         (item.status.conditions | selectattr('type', '==', 'Degraded'))[0].status != "False")
+  ansible.builtin.set_fact:
+    cr_bad_co: "{{ cr_bad_co | default([]) + [item.metadata.name] }}"
+
+- name: report if one or more ClusterOperators with incorrect state
+  when: (cr_bad_co | length) != 0
+  vars:
+    _new_result: "the following ClusterOperators not in correct state: {{ cr_bad_co | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

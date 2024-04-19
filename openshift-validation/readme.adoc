@@ -1,0 +1,426 @@
+= OpenShift Validation
+:icons: font
+:toc:
+
+== Validation Details
+
+This repository contains the Ansible playbooks and roles for validating an OpenShift cluster.
+
+=== OpenShift Cluster Readiness
+
+The link:./openshift-readiness.yaml[playbook] performs the following opinionated validations:
+
+[cols="1,4,1"]
+|===
+.2+| oAuth server metadata
+| verify the oauth server's `/.well-known/oauth-authorization-server` endpoint returns metadata.
+| link:https://docs.openshift.com/container-platform/latest/authentication/configuring-internal-oauth.html#oauth-server-metadata_configuring-internal-oauth[documentation]
+
+| verify oAuth server issuer metadata is as expected.
+| link:https://docs.openshift.com/container-platform/latest/authentication/configuring-internal-oauth.html#oauth-server-metadata_configuring-internal-oauth[documentation]
+
+| cluster version
+| verify `ClusterVersion` is as specified.
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#getting-cluster-version-and-update-details_validating-an-installation[documentation]
+
+| cluster operators
+| verify all `ClusterOperators` are in the correct state (`Available: true`, `Progressing: false`, `Degraded: false`).
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#getting-cluster-version-and-update-details_validating-an-installation[documentation]
+
+| machine config pools
+| verify all nodes belong to a `MachineConfigPool`.
+| link:https://www.redhat.com/en/blog/openshift-container-platform-4-how-does-machine-config-pool-work[documentation]
+
+.2+| machines
+| verify all machines are in `Running` state.
+| link:https://docs.openshift.com/container-platform/latest/machine_management/machine-phases-lifecycle.html[documentation]
+
+| verify number of machines and nodes is equal.
+| link:https://docs.openshift.com/container-platform/latest/installing/index.html#ipi-verifying-nodes-after-installation_ocp-installation-overview[documentation]
+
+.6+| nodes
+| verify number of control nodes is as specified.
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
+
+| verify number of worker nodes is as specified.
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
+
+| verify all nodes are in `Ready` state.
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
+
+| verify all control nodes are unschedulable. Reference
+| link:https://docs.openshift.com/container-platform/latest/nodes/nodes/nodes-nodes-managing.html#nodes-nodes-working-master-schedulable_nodes-nodes-managing[documentation]
+
+| verify `cAdvisor` is collecting metrics for all nodes.
+| link:https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/[documentation]
+
+| verify cpu and memory metrics for nodes are collected. Reference
+| link:https://docs.openshift.com/container-platform/latest/support/troubleshooting/verifying-node-health.html[documentation]
+
+| certificate signing request
+| verify no `CertificateSigningRequests` are pending.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/node-tasks.html#installation-approve-csrs_post-install-node-tasks[documentation]
+
+.3+| wildcard DNS and certificate
+| verify default ingress DNS domain is as specified.
+| link:https://docs.openshift.com/container-platform/latest/networking/ingress-operator.html#nw-installation-ingress-config-asset_configuring-ingress[documentation]
+
+| verify wildcard DNS domain `*.apps.<cluster-name>.<base-domain>`.
+| link:https://docs.openshift.com/container-platform/latest/installing/installing_platform_agnostic/installing-platform-agnostic.html#installation-dns-user-infra_installing-platform-agnostic[documentation]
+
+| verify ingress serving certificate Subject Alternative Names include th wildcard DNS hostname `*.apps.<cluster-name>.<base-domain>`.
+| link:https://docs.openshift.com/container-platform/latest/networking/ingress-operator.html#nw-ingress-setting-a-custom-default-certificate_configuring-ingress[documentation]
+
+.2+| CoreDNS
+| verify DNS lookup of service A record.
+| link:https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services[documentation]
+
+| verify DNS lookup of service SRV record.
+| link:https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services[documentation]
+
+| NTP
+| verify ntp is synchronized on all nodes.
+| link:https://docs.openshift.com/container-platform/latest/installing/installing_bare_metal_ipi/ipi-install-troubleshooting.html#ipi-install-troubleshooting-ntp-out-of-sync_ipi-install-troubleshooting[documentation]
+
+| kubeadmin user
+| verify `kubeadmin` user is removed.
+| link:https://docs.openshift.com/container-platform/latest/authentication/remove-kubeadmin.html[documentation]
+
+.5+| oauth
+| verify `accessTokenMaxAgeSeconds` is configure.
+| link:https://docs.openshift.com/container-platform/latest/authentication/configuring-internal-oauth.html#oauth-configuring-internal-oauth_configuring-internal-oauth[documentation]
+
+| verify `accessTokenInactivityTimeout` is configured.
+| link:https://docs.openshift.com/container-platform/latest/authentication/configuring-internal-oauth.html#oauth-token-inactivity-timeout_configuring-internal-oauth[documentation]
+
+| verify at least one identity provider is configured.
+| link:https://docs.openshift.com/container-platform/latest/authentication/understanding-identity-provider.html[documentation]
+
+| verify ldap identity provider uses secured connection.
+| link:https://docs.openshift.com/container-platform/latest/authentication/identity_providers/configuring-ldap-identity-provider.html#identity-provider-ldap-CR_configuring-ldap-identity-provider[documentation]
+
+| verify console login banner is configured.
+| link:https://www.redhat.com/en/blog/customize-openshift-login-with-us-government-banner[documentation]
+
+| CLI motd
+| verify motd is configured.
+| link:https://access.redhat.com/solutions/5099311[documentation]
+
+.5+| etcd
+| verify etcd is healthy.
+| link:https://etcd.io/docs/v3.5/tutorials/how-to-check-cluster-status/[documentation]
+
+| verify performance of disk hosting etcd.
+| link:https://docs.openshift.com/container-platform/latest/scalability_and_performance/recommended-performance-scale-practices/recommended-etcd-practices.html#recommended-etcd-practices_recommended-etcd-practices[documentation]
+
+| verify etcd data is encrypted.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#about-etcd_post-install-cluster-tasks[documentation]
+
+| verify etcd data encryption is `aes-gcm`.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#about-etcd_post-install-cluster-tasks[documentation]
+
+| verify etcd data encryption is completed.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#about-etcd_post-install-cluster-tasks[documentation]
+
+.6+| TLS security profile
+| verify `IngressController` not configured with `Old` `tlsSecurityProfile`.
+| link:https://docs.openshift.com/container-platform/latest/security/tls-security-profiles.html#tls-profiles-ingress-configuring_tls-security-profiles[documentation]
+
+| verify `IngressController` `Custom` `tlsSecurityProfile` not configure with `minTLSVersion` set to `VersionTLS10` or `VersionTLS11`.
+| link:https://access.redhat.com/articles/5348961[documentation]
+
+| verify `APIServer` not configured with `Old` `tlsSecurityProfile`.
+| link:https://docs.openshift.com/container-platform/latest/security/tls-security-profiles.html#tls-profiles-kubernetes-configuring_tls-security-profiles[documentation]
+
+| verify `APIServer` `Custom` `tlsSecurityProfile` not configure with `minTLSVersion` set to `VersionTLS10` or `VersionTLS11`.
+| link:https://access.redhat.com/articles/5348961[documentation]
+
+| verify `KubeletConfig` not configured with `Old` `tlsSecurityProfile`.
+| link:https://docs.openshift.com/container-platform/latest/security/tls-security-profiles.html#tls-profiles-kubelet-configuring_tls-security-profiles[documentation]
+
+| verify `KubeletConfig` `Custom` `tlsSecurityProfile` not configure with `minTLSVersion` set to `VersionTLS10` or `VersionTLS11`.
+| link:https://access.redhat.com/articles/5348961[documentation]
+
+| audit profile
+| verify audit profile is configured.
+| link:https://docs.openshift.com/container-platform/latest/security/audit-log-policy-config.html[documentation]
+
+| project self provisioner
+| verify project self provisioner is not allowed for authenticated users.
+| link:https://docs.openshift.com/container-platform/latest/applications/projects/configuring-project-creation.html#disabling-project-self-provisioning_configuring-project-creation[documentation]
+
+.2+| project request template
+| verify project request template is configured.
+| link:https://docs.openshift.com/container-platform/latest/applications/projects/configuring-project-creation.html[documentation]
+
+| verify project request template defines: Project, LimitRange, ResourceQuota, NetworkPolicy.
+| link:https://docs.openshift.com/container-platform/latest/applications/projects/configuring-project-creation.html[documentation]
+
+.3+| storage class
+| verify default storage class is configured.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/storage-configuration.html#storage-class-annotations_post-install-storage-configuration[documentation]
+
+| verify only one default storage class is configured.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/storage-configuration.html#storage-class-annotations_post-install-storage-configuration[documentation]
+
+| verify default storage class is as specified.
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/storage-configuration.html#storage-class-annotations_post-install-storage-configuration[documentation]
+
+.6+| operator hub
+| verify default `CatalogSources` are disable as specified.
+| link:https://docs.openshift.com/container-platform/latest/operators/understanding/olm-rh-catalogs.html[documentation]
+
+| verify at least one `CatalogSource` is configured.
+| link:https://docs.openshift.com/container-platform/latest/operators/admin/olm-managing-custom-catalogs.html#olm-creating-catalog-from-index_olm-managing-custom-catalogs[documentation]
+
+| verify all `CatalogSources` are in `READY` state.
+| link:https://docs.openshift.com/container-platform/latest/operators/admin/olm-managing-custom-catalogs.html#olm-creating-catalog-from-index_olm-managing-custom-catalogs[documentation]
+
+| verify `CatalogSources` have `PackageManifests`.
+| link:https://docs.openshift.com/container-platform/latest/operators/admin/olm-managing-custom-catalogs.html#olm-creating-catalog-from-index_olm-managing-custom-catalogs[documentation]
+
+| verify all `ClusterServiceVersions` are in `Succeeded` phase.
+| link:https://docs.openshift.com/container-platform/latest/operators/understanding/olm/olm-understanding-olm.html#olm-csv_olm-understanding-olm[documentation]
+
+| verify all `InstallPlan` are approved.
+| link:https://docs.openshift.com/container-platform/latest/operators/understanding/olm/olm-understanding-olm.html#olm-installplan_olm-understanding-olm[documentation]
+
+.5+| monitoring stack
+| verify user workload monitoring is enabled.
+| link:https://docs.openshift.com/container-platform/latest/observability/monitoring/enabling-monitoring-for-user-defined-projects.html[documentation]
+
+| verify cluster monitoring stack is using persistent volume.
+| link:https://docs.openshift.com/container-platform/latest/observability/monitoring/configuring-the-monitoring-stack.html#configuring_persistent_storage_configuring-the-monitoring-stack:[documentation]
+
+| verify user workload monitoring stack is using persistent volume.
+| link:https://docs.openshift.com/container-platform/latest/observability/monitoring/configuring-the-monitoring-stack.html#configuring_persistent_storage_configuring-the-monitoring-stack[documentation]
+
+| verify AlertManager has at least one receiver configured
+| link:https://docs.openshift.com/container-platform/latest/observability/monitoring/managing-alerts.html#sending-notifications-to-external-systems_managing-alerts[documentation]
+
+| verify alert notifications are sent to external system
+| link:https://docs.openshift.com/container-platform/latest/observability/monitoring/managing-alerts.html#sending-notifications-to-external-systems_managing-alerts[documentation]
+
+.4+| logging stack
+| verify openshift logging operator is deployed.
+| link:https://docs.openshift.com/container-platform/latest/logging/cluster-logging-deploying.html#cluster-logging-deploy-cli_cluster-logging-deploying[documentation]
+
+| verify `ClusterLogging` instance exist.
+| link:https://docs.openshift.com/container-platform/latest/logging/cluster-logging-deploying.html#create-cluster-logging-cli_cluster-logging-deploying[documentation]
+
+| verify `ClusterLogging` instance is in `Managed` state.
+| link:https://docs.openshift.com/container-platform/latest/logging/cluster-logging-deploying.html#create-cluster-logging-cli_cluster-logging-deploying[documentation]
+
+| verify `ClusterLogging` collector type is `vector`.
+| link:https://docs.openshift.com/container-platform/latest/logging/cluster-logging-deploying.html#configuring-logging-collector_cluster-logging-deploying[documentation]
+
+.4+| image controller config
+| verify image registries whitelist is configured.
+| link:https://docs.openshift.com/container-platform/latest/openshift_images/image-configuration.html[documentation]
+
+| verify insecure image registries are not allowed.
+| link:https://docs.openshift.com/container-platform/latest/openshift_images/image-configuration.html[documentation]
+
+| verify import from insecure image registries are not allowed.
+| link:https://docs.openshift.com/container-platform/latest/openshift_images/image-configuration.html[documentation]
+
+| verify `samplesRegistry` is configured.
+| link:https://access.redhat.com/solutions/6547281[documentation]
+
+| openshift image registry
+| verify image registry is not using `emptyDir` storage if it is in `Managed` state.
+| link:https://docs.openshift.com/container-platform/latest/registry/configuring-registry-operator.html[documentation]
+
+.5+| pods
+| verify all pods are in `Running` or `Completed` state.
+| link:https://docs.openshift.com/container-platform/latest/rest_api/workloads_apis/pod-v1.html#status[documentation]
+
+| verify no pod in `default` or `openshift` namespaces.
+|
+
+| verify pods with too many restarts.
+|
+
+| verify `cAdvisor` is collecting metrics for all pods.
+| link:https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/[documentation]
+
+| verify cpu and memory metrics for pods are collected.
+| link:https://docs.openshift.com/container-platform/latest/nodes/pods/nodes-pods-viewing.html#nodes-pods-viewing-usage_nodes-pods-viewing[documentation]
+|===
+
+=== Application Readiness
+
+The link:./application-readiness.yaml[playbook] is base on this link:https://developers.redhat.com/learning/learn:openshift:foundations-openshift/resource/resources:work-databases-openshift-web-console[OpenShift Learning path], it:
+
+- stateful application:
+  . deploys `mongodb` StatefulSet and `namegen` Deployment.
+  . exposes the `namegen` service externally via Route.
+  . creates database, collection, and document in mongodb.
+  . stimulate failure by killing `mongodb` and `namegeb` pods; OpenShift will restart the pods.
+  . compare documents in mongodb before and after failure.
+  . deletes the resources created.
+- stateless application:
+  . configure Role and RoleBinding to allow `get` and `list` access o Pods and ConfigMaps.
+  . deploys `ose-tools` image to run `oc` and `curl` commands against OpenShift API server, to get/list Pods, ConfigMaps, Secrets and Nodes.
+
+Successful playbook execution confirms the following:
+
+- create/delete OpenShift resources (Namespace, Secret, ConfigMap, PersistentVolumeClaim, PersistentVolume, NetworkPolicy, StatefulSet, Deployment, Job, Service, Route, Role, RoleBinding, etc).
+- default storage class is configured.
+- dynamic provisioning of persistent volume.
+- persistent volume for storing stateful data; no data loss when application pods failed.
+- consuming OpenShift Secret/ConfigMap ss volume or environment variables.
+- service discovery via CoreDNS.
+- ingress and egress network policies to allow only necessary traffic, denies the rest.
+- externally exposed application service is accessible.
+- RBAC to allow access to specific OpenShift resources from within the container.
+
+[IMPORTANT]
+====
+The playbook does not deploy the application with common best practices:
+
+- images are pulled from `quay.io` without authentication.
+- secrets store in environment variables.
+- no TLS encryption for network communication.
+- password stored in Git repository.
+====
+
+=== Cluster Capacity Estimation
+
+The link:./cluster-capacity.yaml[playbook] estimates the capacity of the cluster using link:https://docs.openshift.com/container-platform/latest/nodes/clusters/nodes-cluster-resource-levels.html[OpenShift Cluster Capacity Tool]. The tool estimates the number of pods that can be scheduled on the cluster with this link:./roles/cluster-capacity/templates/configmap.yaml.j2[podSpec].
+
+== Requirements
+
+[cols="1,3"]
+|===
+| System
+a| - RHEL v8.x or above
+- Python v3.8 or above
+- Ansible v2.13 or above
+- ansible-navigator v3.0.0 or above
+- `oc` command line tool  (for `oc debug`)
+
+| Ansible content collections
+a| - kubernetes.core v2.4.0
+- community.crypto v2.15.1
+- community.general v7.5.0
+
+| Python modules
+a| - kubernetes v26.1.0
+- dnspython v2.6.1
+
+| OpenShift cluster
+a|
+* `cluster-admin` privileges, or
+* custom privileges:
+** read privileges for almost all resources,
+** privileges to run `oc debug node/nodename` command,
+** privileges to create/delete clusterRole and clusterRoleBinding, and
+** privileges to create Namespaces and resources in the namespace.
+|===
+
+== Ansible Execution Environment
+
+Instead of installing the dependencies on the host, use the execution environment image `quay.io/bkhoo/ee-openshift-validation:1.0` to run the playbooks with `ansible-navigator run` command line.
+
+See link:execution-environment/readme.adoc[this document] for the steps to build execution environment image.
+
+== Usage
+
+. Create a YAML file with the following settings:
++
+[source,yaml]
+----
+---
+kubeconfig_file: /home/bkhoo/.kube/config
+
+cluster_version: 4.15.8
+
+cluster_ingress_domain: apps.cluster-12345.examle.com
+ingress_ip:
+  - 192.168.192.168
+
+control_nodes: 3
+worker_nodes: 3
+
+default_storage_class: ocs-external-storagecluster-ceph-rbd
+
+# min_access_token_max_age_seconds: 600        # playbook default
+# min_access_token_inactivity_timeout: 600     # playbook default
+
+# etc_encryption_type: aesgcm                  # playbook default
+
+# allowed_registries:                          # playbook default
+#   - quay.io
+#   - registry.redhat.io
+#   - registry.access.redhat.com
+#   - image-registry.openshift-image-registry.svc:5000
+
+# acceptable_audit_profiles:                   # playbook default
+#   - WriteRequestBodies
+#   - AllRequestBodies
+
+# project_template_objects:                    # playbook default
+#   - Project
+#   - LimitRange
+#   - ResourceQuota
+#   - NetworkPolicy
+
+# disable_default_catalog_sources:             # playbook default
+#   - community-operators
+
+# pod_too_many_restarts: 100                   # playbook default
+...
+----
+
+. Execute ansible playbook (no inventory required):
+  * OpenShift cluster readiness verification:
++
+[source,bash]
+----
+ansible-navigator run openshift-readiness.yaml \
+  --extra-vars @settings.yaml \
+  --pull-policy missing \
+  --execution-environment true \
+  --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
+  --execution-environment-volume-mounts /home/bkhoo/.kube:/home/bkhoo/.kube:Z
+
+### alternate method to run the playbook; this method requires all dependencies installed
+ansible-playbook openshift-readiness.yaml --extra-vars @settings.yaml
+----
+
+  * Application readiness:
++
+[source,bash]
+----
+ansible-navigator run application-readiness.yaml \
+  --extra-vars @settings.yaml \
+  --pull-policy missing \
+  --execution-environment true \
+  --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
+  --execution-environment-volume-mounts /home/bkhoo/.kube:/home/bkhoo/.kube:Z
+
+### alternate method to run the playbook; this method requires all dependencies installed
+ansible-playbook application-readiness.yaml --extra-vars @settings.yaml
+----
+
+  * Cluster capacity estimation:
++
+[source,bash]
+----
+ansible-navigator run cluster-capacity.yaml \
+  --extra-vars @settings.yaml \
+  --pull-policy missing \
+  --execution-environment true \
+  --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
+  --execution-environment-volume-mounts /home/bkhoo/.kube:/home/bkhoo/.kube:Z
+
+### alternate method to run the playbook; this method requires all dependencies installed
+ansible-playbook cluster-capacity.yaml --extra-vars @settings.yaml
+----
+
+== To Do
+
+- infra nodes.
+- infra workloads are deployed to infra nodes.
+- logs are forwarded to external log aggregator.

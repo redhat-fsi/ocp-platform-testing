@@ -1,0 +1,48 @@
+ar_rbac_test_script: |
+  oc get pods --request-timeout=10s &> /dev/null
+  echo "get pods rc: $?"
+
+  oc get configmaps --request-timeout=10s &> /dev/null
+  echo "get configmaps rc: $?"
+
+  oc get secrets --request-timeout=10s &> /dev/null
+  echo "get secrets rc: $?"
+
+  oc get nodes --request-timeout=10s &> /dev/null
+  echo "get nodes rc: $?"
+
+  NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+  curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    --header "Authorization: Bearer ${TOKEN}" \
+    --silent --connect-timeout 10 --output /dev/null --write-out "curl pods status: %{http_code}" \
+    https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/pods
+  echo ""
+
+  curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    --header "Authorization: Bearer ${TOKEN}" \
+    --silent --connect-timeout 10 --output /dev/null --write-out "curl configmaps status: %{http_code}" \
+    https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/configmaps
+  echo ""
+
+  curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    --header "Authorization: Bearer ${TOKEN}" \
+    --silent --connect-timeout 10 --output /dev/null --write-out "curl secrets status: %{http_code}" \
+    https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets
+  echo ""
+
+  curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    --header "Authorization: Bearer ${TOKEN}" \
+    --silent --connect-timeout 10 --output /dev/null --write-out "curl nodes status: %{http_code}" \
+    https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes
+
+ar_exported_job_result:
+  - "get pods rc: 0"
+  - "get configmaps rc: 0"
+  - "get secrets rc: 1"
+  - "get nodes rc: 1"
+  - "curl pods status: 200"
+  - "curl configmaps status: 200"
+  - "curl secrets status: 403"
+  - "curl nodes status: 403"

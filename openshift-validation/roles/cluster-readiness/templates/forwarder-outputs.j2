@@ -1,0 +1,10 @@
+{%- set output_names = [] -%}
+{%- for forwarder in _forwarders -%}
+  {%- if forwarder.spec.outputs is defined -%}
+    {%- for output in forwarder.spec.outputs -%}
+      {{ output_names.append(forwarder.metadata.name + '/' + output.name) }}
+    {%- endfor %}
+  {%- endif %}
+{%- endfor %}
+
+{{ output_names | to_yaml }}

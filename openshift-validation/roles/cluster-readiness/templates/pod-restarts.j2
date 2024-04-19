@@ -1,0 +1,11 @@
+{%- set bad_pods = [] -%}
+{%- for pod in _all_pods -%}
+  {%- set restart_count = 0 -%}
+  {%- if pod.status.containerStatuses is defined -%}
+    {%- set restart_count = (pod.status.containerStatuses | map(attribute='restartCount') | sum) -%}
+    {%- endif -%}
+  {%- if restart_count > pod_too_many_restarts -%}
+    {%- set _ = bad_pods.append(pod.metadata.namespace + '/' + pod.metadata.name) -%}
+  {%- endif -%}
+{%- endfor -%}
+{{ bad_pods | to_json }}

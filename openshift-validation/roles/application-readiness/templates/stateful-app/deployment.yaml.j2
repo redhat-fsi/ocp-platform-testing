@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: namegen
+  labels:
+    app: readiness-test
+    component: namegen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: readiness-test
+      component: namegen
+  template:
+    metadata:
+      labels:
+        app: readiness-test
+        component: namegen
+    spec:
+      containers:
+        - name: namegen-app
+          image: {{ namegen_image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MONGODB_URL
+              value: "mongodb://{{ mongodb_app_username }}:{{ mongodb_app_password }}@mongodb:27017/namegen"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+
+{% if deploy_mongo_express | bool %}
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express
+  labels:
+    app: readiness-test
+    component: mongo-express
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: readiness-test
+      component: mongo-express
+  template:
+    metadata:
+      labels:
+        app: readiness-test
+        component: mongo-express
+    spec:
+      containers:
+        - name: mongo-express
+          image: {{ mongo_express_image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ME_CONFIG_MONGODB_URL
+              value: "mongodb://{{ mongodb_root_username }}:{{ mongodb_root_password }}@mongodb:27017/"
+            #- name: ME_CONFIG_MONGODB_TLS_ALLOW_CERTS
+            #  value: "true"
+            #- name: ME_CONFIG_MONGODB_TLS_CA_FILE
+            #  value: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+            #- name: ME_CONFIG_BASICAUTH
+            #  value: "true"
+            - name: ME_CONFIG_BASICAUTH_USERNAME
+              value: admin
+            - name: ME_CONFIG_BASICAUTH_PASSWORD
+              value: password
+          ports:
+            - name: mongo-express
+              containerPort: 8081
+{% endif %}
+...

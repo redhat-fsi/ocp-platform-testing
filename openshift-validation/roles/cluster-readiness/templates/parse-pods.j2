@@ -1,0 +1,21 @@
+{%- set bad_pods = [] -%}
+{%- set forbidden_ns_pods = [] -%}
+{%- for pod in _all_pods -%}
+  {%- if pod.metadata.namespace in _forbidden_ns -%}
+    {{ forbidden_ns_pods.append(pod.metadata.namespace + '/' + pod.metadata.name) }}
+  {%- endif -%}
+  {%- if pod.status.phase == "Running" -%}
+    {%- for c_status in pod.status.containerStatuses -%}
+      {%- if c_status.state.running is not defined -%}
+        {{ bad_pods.append(pod.metadata.namespace + '/' + pod.metadata.name) }}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- elif pod.status.phase != "Succeeded" -%}
+    {{ bad_pods.append(pod.metadata.namespace + '/' + pod.metadata.name) }}
+  {%- endif -%}
+{%- endfor -%}
+
+{
+  "forbidden_ns_pods": {{ forbidden_ns_pods | to_json }},
+  "bad_pods": {{ bad_pods | unique | to_json }}
+}

@@ -1,0 +1,26 @@
+---
+- name: initialize variables
+  ansible.builtin.set_fact:
+    cr_pending_csr: []
+
+- name: get CertificateSigningRequest
+  register: cr_get_csr_result
+  kubernetes.core.k8s_info:
+    api_version: certificates.k8s.io/v1
+    kind: CertificateSigningRequest
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: check for pending CertificateSigningRequests
+  loop: "{{ cr_get_csr_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: item.status.conditions is not defined
+  ansible.builtin.set_fact:
+    cr_pending_csr: "{{ cr_pending_csr + [item.metadata.name] }}"
+
+- name: report if one or more CertificateSigningRequests in pending state
+  when: cr_pending_csr | length > 0
+  vars:
+    _new_result: "one or more CertificateSigningRequest in pending state"
+  ansible.builtin.include_tasks: store-result.yaml
+...

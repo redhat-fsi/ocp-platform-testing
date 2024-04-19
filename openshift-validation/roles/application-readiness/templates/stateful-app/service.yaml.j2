@@ -1,0 +1,67 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    app: readiness-test
+    component: mongodb
+spec:
+  type: ClusterIP
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+    - IPv4
+  selector:
+    component: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      protocol: TCP
+      targetPort: 27017
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: namegen
+  labels:
+    app: readiness-test
+    component: namegen
+spec:
+  type: ClusterIP
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+    - IPv4
+  selector:
+    component: namegen
+  ports:
+    - name: namegen
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+
+{% if deploy_mongo_express | bool %}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express
+  labels:
+    app: readiness-test
+    component: mongo-express
+spec:
+  type: ClusterIP
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+    - IPv4
+  selector:
+    component: mongo-express
+  ports:
+    - name: mongo-express
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+{% endif %}
+...

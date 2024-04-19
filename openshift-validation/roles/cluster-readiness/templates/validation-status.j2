@@ -1,0 +1,8 @@
+{%- if (cr_verification_results | length) == 0 and cr_all_completed -%}
+  {% set status = 'PASSED' -%}
+{%- elif (cr_verification_results | length) == 0 and not cr_all_completed -%}
+  {% set status = 'UNKNOWN' -%}
+{%- else -%}
+  {% set status = 'FAILED' -%}
+{%- endif -%}
+{{ status }}

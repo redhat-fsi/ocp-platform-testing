@@ -1,0 +1,14 @@
+{%- set nodes_with_no_mcp = [] -%}
+{%- for node in _nodes -%}
+  {%- set has_mcp = [] -%}
+  {%- for label_key in node.metadata.labels.keys() -%}
+    {%- if (label_key | trim) in _mcp_node_selector -%}
+      {%- set _ = has_mcp.append(true) -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if (has_mcp | unique) != [True] -%}
+    {%- set _ = nodes_with_no_mcp.append(node.metadata.name) -%}
+  {%- endif %}
+{%- endfor -%}
+
+{{ nodes_with_no_mcp | to_json }}

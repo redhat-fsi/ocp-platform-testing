@@ -1,0 +1,74 @@
+---
+- name: get cluster monitoring config
+  register: cr_get_config_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: cluster-monitoring-config
+    namespace: openshift-monitoring
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: load cluster monitoring config
+  ansible.builtin.set_fact:
+    cr_mon_config: "{{ {} if ((cr_get_config_result.resources | length) == 0 or
+                              (cr_get_config_result.resources[0] and
+                               cr_get_config_result.resources[0].data['config.yaml'] is not defined))
+                       else (cr_get_config_result.resources[0].data['config.yaml'] | from_yaml) }}"
+
+- name: report if user workload monitoring is not enabled
+  when: cr_mon_config == {} or
+        (cr_mon_config != {} and not cr_mon_config.enableUserWorkload)
+  vars:
+    _new_result: "user workload monitoring is not enabled"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: parse cluster monitoring persistent volumes config
+  loop:
+    - prometheusK8s
+    - alertmanagerMain
+  ansible.builtin.set_fact:
+    cr_monitoring_pv: "{{ cr_monitoring_pv | default([]) +
+                          ([item] if (cr_mon_config[item] is not defined or
+                                      (cr_mon_config[item] is defined and
+                                       cr_mon_config[item].volumeClaimTemplate is not defined))
+                                  else []) }}"
+
+- name: report if cluster monitoring stack not using persistent volume
+  when: cr_monitoring_pv | length != 0
+  vars:
+    _new_result: "cluster monitoring stack not using persistent volume: {{ cr_monitoring_pv | join(' ,') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: get user workload monitoring config
+  register: cr_get_user_config_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: user-workload-monitoring-config
+    namespace: openshift-user-workload-monitoring
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: load user workload monitoring config
+  ansible.builtin.set_fact:
+    cr_user_mon_config: "{{ {} if ((cr_get_user_config_result.resources | length) == 0 or
+                                   (cr_get_user_config_result.resources[0] and
+                                    cr_get_user_config_result.resources[0].data['config.yaml'] is not defined))
+                               else (cr_get_user_config_result.resources[0].data['config.yaml'] | from_yaml) }}"
+
+- name: parse user workload monitoring persistent volumes config
+  loop:
+    - prometheus
+    - thanosRuler
+  ansible.builtin.set_fact:
+    cr_user_monitoring_pv: "{{ cr_user_monitoring_pv | default([]) +
+                            ([item] if (cr_user_mon_config[item] is not defined or
+                                        (cr_user_mon_config[item] is defined and
+                                         cr_user_mon_config[item].volumeClaimTemplate is not defined))
+                                    else []) }}"
+
+- name: report if user workload monitoring stack not using persistent volume
+  when: (cr_user_monitoring_pv | length) != 0
+  vars:
+    _new_result: "user workload monitoring stack not using persistent volume: {{ cr_user_monitoring_pv | join(' ,') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

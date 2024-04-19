@@ -1,0 +1,15 @@
+---
+- name: get ClusterVersion
+  register: cr_get_cv_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    name: version
+    kubeconfig: "{{ kubeconfig_file }}"
+
+- name: report if ClusterVersion is not as specified
+  when: cr_get_cv_result.resources[0].status.desired.version != cluster_version
+  vars:
+    _new_result: "ClusterVersion is not as specified"
+  ansible.builtin.include_tasks: store-result.yaml
+...

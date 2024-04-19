@@ -1,0 +1,43 @@
+# the extension of this file must be .yml
+# 'ansible-builder create' command by default look for execution-environment.yml file to build context
+# to use other filename, use 'ansible-builder create --file execution-environment.yaml'
+
+# version 3 of execution environment spec has significant changes, and is not compatible with version 1
+# see https://ansible.readthedocs.io/projects/builder/en/stable/definition/
+version: 3
+
+build_arg_defaults:
+  ANSIBLE_GALAXY_CLI_COLLECTION_OPTS: '--pre'
+
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.15.5
+  ansible_runner:
+    package_pip: ansible-runner
+  galaxy: requirements.yaml
+  python: requirements.txt
+  system: bindep.txt
+
+images:
+  base_image:
+    name: registry.access.redhat.com/ubi9:9.3-1610
+    # DO NOT publicly distribute container images that is built from the automation execution environment images
+    # name: registry.redhat.io/ansible-automation-platform-24/ee-minimal-rhel9:latest
+
+additional_build_files:
+  - src: ansible.cfg
+    dest: configs
+
+additional_build_steps:
+  prepend_galaxy:   # there is no need to delete the .ansible.cfg as it is not copy in the final build stage
+    - COPY _build/configs/ansible.cfg /etc/ansible.cfg    # do not use ~ for home directory, use $HOME
+    - RUN sed -i "s/DUMMYTOKEN/$(cat /var/run/secrets/automation-hub-token)/" /etc/ansible.cfg
+  # without the two prepend_* below, ee image build will fail, see https://access.redhat.com/solutions/7024259
+  prepend_builder:
+    - ENV PKGMGR_OPTS="--nodocs --setopt=install_weak_deps=0 --setopt=rhocp-4.13-for-rhel-9-x86_64-rpms.enabled=true"
+  prepend_final:
+    - ENV PKGMGR_OPTS="--nodocs --setopt=install_weak_deps=0 --setopt=rhocp-4.13-for-rhel-9-x86_64-rpms.enabled=true"
+
+options:
+  package_manager_path: /usr/bin/dnf         # use dnf when using ubi9 base image
+  # package_manager_path: /usr/bin/microdnf    # use microdnf when using ee-minimal-rhel9 base image

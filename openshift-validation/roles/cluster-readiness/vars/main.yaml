@@ -1,0 +1,6 @@
+---
+# not expecting these as user inputs
+working_namespace_prefix: readiness-test-   # for oc debug; some policies might block oc debug pod
+samples_registry: registry.redhat.io
+etcd_fsync_message: "99th percentile of the fsync is within the recommended threshold"
+...

@@ -1,0 +1,2 @@
+kubernetes==26.1.0
+dnspython==2.6.1

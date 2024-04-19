@@ -1,0 +1,19 @@
+---
+app_namespace_prefix: app-readiness-
+
+mongodb_image: quay.io/mongodb/mongodb-community-server:latest
+namegen_image: quay.io/bkhoo/namegen-app:1.0
+mongo_express_image: docker.io/mongo-express:latest
+openshift_tools_image: registry.redhat.io/openshift4/ose-tools-rhel8
+
+mongodb_root_username: root
+mongodb_root_password: rootpassword
+
+mongodb_app_username: app
+mongodb_app_password: apppassword
+
+
+# these are for debugging purpose only
+delete_resources: true
+deploy_mongo_express: false
+...
