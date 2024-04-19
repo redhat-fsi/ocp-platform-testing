@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: application-readiness
+  author: Red Hat Consulting
+  description: Verify OpenShift cluster is ready for user applications
+  company: Red Hat
+  license: MIT License
+  min_ansible_version: 2.13
+  platforms:
+    - name: EL
+      versions:
+        - 8
+        - 9
+  galaxy_tags:
+    - cloud
+    - openshift
+
+dependencies: []
+...

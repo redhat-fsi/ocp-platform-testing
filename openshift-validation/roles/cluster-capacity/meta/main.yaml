@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: cluster-capacity
+  author: Red Hat Consulting
+  description: Estimate number of pods that can be scheduled on the OpenShit cluster
+  company: Red Hat
+  license: MIT License
+  min_ansible_version: 2.13
+  platforms:
+    - name: EL
+      versions:
+        - 8
+        - 9
+  galaxy_tags:
+    - cloud
+    - openshift
+
+dependencies: []
+...
