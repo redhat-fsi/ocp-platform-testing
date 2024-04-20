@@ -22,8 +22,8 @@
     kubeconfig: "{{ kubeconfig_file }}"
 
 - name: wait 10 seconds
-  ansible.builtin.set_fact:
-    __: "{{ lookup('ansible.builtin.pipe', 'sleep 10') }}"
+  ansible.builtin.wait_for:
+    timeout: 10
 
 - name: wait until no terminating pods
   register: ar_pods_result

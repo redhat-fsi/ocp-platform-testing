@@ -1,7 +1,7 @@
 ---
 - name: wait 5 seconds
-  ansible.builtin.set_fact:
-    __: "{{ lookup('ansible.builtin.pipe', 'sleep 5') }}"
+  ansible.builtin.wait_for:
+    timeout: 5
 
 - name: wait for deployments to be ready
   register: ar_deployment_result
