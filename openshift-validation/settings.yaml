@@ -1,18 +1,23 @@
 ---
 kubeconfig_file: /home/bkhoo/.kube/config
 
-cluster_version: 4.15.8
+cluster_version: 4.15.10
 
-cluster_ingress_domain: apps.cluster-12345.examle.com
+cluster_ingress_domain: apps.cluster-rgnhk.dynamic.redhatworkshops.io
 ingress_ip:
-  - 192.168.192.168
+  - 150.240.143.110
 
 control_nodes: 3
 worker_nodes: 3
+infra_nodes: 0
 
 default_storage_class: ocs-external-storagecluster-ceph-rbd
 
-# min_access_token_max_age_seconds: 600        # playbook default
+# master_node_label: "node-role.kubernetes.io/master"
+# worker_node_label: "node-role.kubernetes.io/worker"
+# infra_node_label: "node-role.kubernetes.io/infra"
+
+# min_access_token_max_age_seconds: 1800       # playbook default
 # min_access_token_inactivity_timeout: 600     # playbook default
 
 # etc_encryption_type: aesgcm                  # playbook default

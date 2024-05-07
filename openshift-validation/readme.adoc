@@ -19,9 +19,12 @@ The link:./openshift-readiness.yaml[playbook] performs the following opinionated
 | verify oAuth server issuer metadata is as expected.
 | link:https://docs.openshift.com/container-platform/latest/authentication/configuring-internal-oauth.html#oauth-server-metadata_configuring-internal-oauth[documentation]
 
-| cluster version
+.2+| cluster version
 | verify `ClusterVersion` is as specified.
 | link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#getting-cluster-version-and-update-details_validating-an-installation[documentation]
+
+| verify `ClusterVersion` state is `Completed`.
+| link:https://docs.openshift.com/container-platform/latest/rest_api/config_apis/clusterversion-config-openshift-io-v1.html#status-history-2[documentation]
 
 | cluster operators
 | verify all `ClusterOperators` are in the correct state (`Available: true`, `Progressing: false`, `Degraded: false`).
@@ -38,7 +41,7 @@ The link:./openshift-readiness.yaml[playbook] performs the following opinionated
 | verify number of machines and nodes is equal.
 | link:https://docs.openshift.com/container-platform/latest/installing/index.html#ipi-verifying-nodes-after-installation_ocp-installation-overview[documentation]
 
-.6+| nodes
+.7+| nodes
 | verify number of control nodes is as specified.
 | link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
 
@@ -48,14 +51,53 @@ The link:./openshift-readiness.yaml[playbook] performs the following opinionated
 | verify all nodes are in `Ready` state.
 | link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
 
-| verify all control nodes are unschedulable. Reference
+| verify all nodes are schedulable.
+| link:https://docs.openshift.com/container-platform/latest/nodes/nodes/nodes-nodes-working.html#nodes-nodes-working-marking_nodes-nodes-working[documentation]
+
+| verify all control nodes are unschedulable.
 | link:https://docs.openshift.com/container-platform/latest/nodes/nodes/nodes-nodes-managing.html#nodes-nodes-working-master-schedulable_nodes-nodes-managing[documentation]
 
 | verify `cAdvisor` is collecting metrics for all nodes.
 | link:https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/[documentation]
 
-| verify cpu and memory metrics for nodes are collected. Reference
+| verify cpu and memory metrics for nodes are collected.
 | link:https://docs.openshift.com/container-platform/latest/support/troubleshooting/verifying-node-health.html[documentation]
+
+.11+| infra nodes
+| verify infra nodes are defined
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#creating-an-infra-node_post-install-cluster-tasks[documentation]
+
+| verify number of infra nodes is as specified.
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
+
+| verify infra nodes are not also labeled as wroker nodes
+| link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
+
+| verify openshift ingress router pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-router_post-install-cluster-tasks[documentation]
+
+| verify openshift image registry pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-registry_post-install-cluster-tasks[documentation]
+
+| verify openshift monitoring pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-monitoring_post-install-cluster-tasks[documentation]
+
+| verify openshift user workload monitoring pods are on infra nodes
+| link:https://access.redhat.com/solutions/6826361[documentation]
+
+| verify openshift logging pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/latest/observability/logging/scheduling_resources/logging-node-selectors.html#logging-node-selectors[documentation]
+link:https://docs.openshift.com/container-platform/latest/rest_api/operatorhub_apis/subscription-operators-coreos-com-v1alpha1.html#spec-config[documentation]
+
+| verify rhacs pods are on infra nodes
+| link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-central-config-options-ocp.html[documentation]
+link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-secured-cluster-config-options-ocp.html[documentation]
+
+| verify openshift gitops pods are on infra nodes
+| link:https://docs.openshift.com/gitops/latest/gitops_workloads_infranodes/running-gitops-control-plane-workloads-on-infrastructure-nodes.html[documentation]
+
+| verify openshift virtualization pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/latest/virt/post_installation_configuration/virt-node-placement-virt-components.html[documentation]
 
 | certificate signing request
 | verify no `CertificateSigningRequests` are pending.
@@ -334,44 +376,21 @@ See link:execution-environment/readme.adoc[this document] for the steps to build
 ---
 kubeconfig_file: /home/bkhoo/.kube/config
 
-cluster_version: 4.15.8
+cluster_version: 4.15.10
 
-cluster_ingress_domain: apps.cluster-12345.examle.com
+cluster_ingress_domain: apps.cluster-rgnhk.dynamic.redhatworkshops.io
 ingress_ip:
-  - 192.168.192.168
+  - 150.240.143.110
 
 control_nodes: 3
 worker_nodes: 3
+infra_nodes: 0
 
 default_storage_class: ocs-external-storagecluster-ceph-rbd
-
-# min_access_token_max_age_seconds: 600        # playbook default
-# min_access_token_inactivity_timeout: 600     # playbook default
-
-# etc_encryption_type: aesgcm                  # playbook default
-
-# allowed_registries:                          # playbook default
-#   - quay.io
-#   - registry.redhat.io
-#   - registry.access.redhat.com
-#   - image-registry.openshift-image-registry.svc:5000
-
-# acceptable_audit_profiles:                   # playbook default
-#   - WriteRequestBodies
-#   - AllRequestBodies
-
-# project_template_objects:                    # playbook default
-#   - Project
-#   - LimitRange
-#   - ResourceQuota
-#   - NetworkPolicy
-
-# disable_default_catalog_sources:             # playbook default
-#   - community-operators
-
-# pod_too_many_restarts: 100                   # playbook default
 ...
 ----
++
+NOTE: See link:./roles/cluster-readiness/defaults/main.yaml[openshift-readiness role defaults] for other configuration settings.
 
 . Execute ansible playbook (no inventory required):
   * OpenShift cluster readiness verification:
@@ -421,6 +440,9 @@ ansible-playbook cluster-capacity.yaml --extra-vars @settings.yaml
 
 == To Do
 
-- infra nodes.
-- infra workloads are deployed to infra nodes.
+- infra workloads are deployed to infra nodes:
+  * openshift pipelines
+  * service mesh
+  * serverless
 - logs are forwarded to external log aggregator.
+- garbage collection config.

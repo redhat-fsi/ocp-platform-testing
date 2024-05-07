@@ -8,8 +8,14 @@
     kubeconfig: "{{ kubeconfig_file }}"
 
 - name: report if ClusterVersion is not as specified
-  when: cr_get_cv_result.resources[0].status.desired.version != cluster_version
+  when: cr_get_cv_result.resources[0].status.history[0].version != cluster_version
   vars:
-    _new_result: "ClusterVersion is not as specified"
+    _new_result: "ClusterVersion is not as specified: expecting {{ cluster_version }}, got {{ cr_get_cv_result.resources[0].status.history[0].version }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: report if ClusterVersion state is not Completed
+  when: cr_get_cv_result.resources[0].status.history[0].state != "Completed"
+  vars:
+    _new_result: "ClusterVersion state: expecting 'Completed', got '{{ cr_get_cv_result.resources[0].status.history[0].state }}'"
   ansible.builtin.include_tasks: store-result.yaml
 ...

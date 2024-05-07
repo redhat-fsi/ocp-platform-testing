@@ -66,6 +66,18 @@
     _new_result: "the following nodes are not in ready state: {{ cr_not_ready_nodes | join(', ') }}"
   ansible.builtin.include_tasks: store-result.yaml
 
+- name: get list of unschedulable nodes
+  ansible.builtin.set_fact:
+    cordon_nodes: "{{ cr_get_node_result.resources | selectattr('spec.unschedulable', 'defined') |
+                                                     selectattr('spec.unschedulable', '==', true) |
+                                                     map(attribute='metadata.name') }}"
+
+- name: report if one or more nodes are unschedulable
+  when: (cordon_nodes | length) > 0
+  vars:
+    _new_result: "the following nodes are set as unschedulable: {{ cordon_nodes | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
 - name: get scheduler
   register: cr_get_scheduler_result
   kubernetes.core.k8s_info:

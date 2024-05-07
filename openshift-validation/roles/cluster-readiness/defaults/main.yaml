@@ -1,5 +1,11 @@
 ---
-min_access_token_max_age_seconds: 600         # in seconds
+master_node_label: "node-role.kubernetes.io/master"
+worker_node_label: "node-role.kubernetes.io/worker"
+infra_node_label: "node-role.kubernetes.io/infra"
+
+rhacs_namespace: stackrox
+
+min_access_token_max_age_seconds: 1800        # in seconds
 min_access_token_inactivity_timeout: 600      # in seconds
 
 etc_encryption_type: aesgcm

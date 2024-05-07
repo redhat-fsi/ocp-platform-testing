@@ -34,6 +34,9 @@
     - name: nodes
       ansible.builtin.import_tasks: nodes.yaml          # this task list must run after machines.yaml
 
+    - name: infra nodes
+      ansible.builtin.import_tasks: infra-nodes.yaml
+
     - name: CertificateSigningRequest
       ansible.builtin.import_tasks: csr.yaml
 
