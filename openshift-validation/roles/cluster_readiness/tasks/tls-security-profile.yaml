@@ -1,0 +1,73 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_specs: []
+    cr_id_mapping:
+      old_IngressController: TLS-01
+      custom_IngressController: TLS-02
+      old_APIServer: TLS-03
+      custom_APIServer: TLS-04
+      old_KubeletConfig: TLS-05
+      custom_KubeletConfig: TLS-06
+
+- name: Get IngressController
+  register: cr_ic_result
+  kubernetes.core.k8s_info:
+    api_version: operator.openshift.io/v1
+    kind: IngressController
+    name: default
+    namespace: openshift-ingress-operator
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get APIServer
+  register: cr_as_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: APIServer
+    name: cluster
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get KubeletConfig
+  register: cr_kc_result
+  kubernetes.core.k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: KubeletConfig
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Gather specs
+  loop: "{{ cr_ic_result.resources + cr_as_result.resources + cr_kc_result.resources }}"
+  loop_control:
+    label: "{{ item.kind }} {{ item.metadata.name }}"
+  ansible.builtin.set_fact:
+    cr_specs: "{{ cr_specs + [{'kind': item.kind, 'name': item.metadata.name, 'spec': item.spec}] }}"
+
+# default tlsSecurityProfile is Intermediate
+- name: Report if tlsSecurityProfile is Old
+  loop: "{{ cr_specs }}"
+  loop_control:
+    label: "{{ item.kind }} {{ item.name }}"
+  when:
+    - item.spec.tlsSecurityProfile is defined
+    - item.spec.tlsSecurityProfile.type is defined
+    - item.spec.tlsSecurityProfile.type == "Old"
+  vars:
+    _id: "{{ cr_id_mapping['old_' + item.kind] }}"
+    _new_result: "{{ item.kind }} ({{ item.name }}) tlsSecurityProfile is Old"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if tlsSecurityProfile is Custom with forbidden minTLSVersion
+  loop: "{{ cr_specs }}"
+  loop_control:
+    label: "{{ item.kind }} {{ item.name }}"
+  when:
+    - item.spec.tlsSecurityProfile is defined
+    - item.spec.tlsSecurityProfile.type is defined
+    - item.spec.tlsSecurityProfile.type == "Custom"
+    - item.spec.tlsSecurityProfile.custom is defined
+    - item.spec.tlsSecurityProfile.custom.minTLSVersion is defined
+    - item.spec.tlsSecurityProfile.custom.minTLSVersion is in forbidden_tls_security_profile
+  vars:
+    _id: "{{ cr_id_mapping['custom_' + item.kind] }}"
+    _new_result: "{{ item.kind }} ({{ item.name }}) Custom tlsSecurityProfile forbidden minTLSVersion: {{ item.spec.tlsSecurityProfile.custom.minTLSVersion }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

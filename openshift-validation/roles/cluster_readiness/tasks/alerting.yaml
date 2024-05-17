@@ -1,0 +1,56 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_receivers: []
+    cr_routes: []
+    blah: []
+
+- name: Get AlertManager secret
+  register: cr_am_secret_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: alertmanager-main
+    namespace: openshift-monitoring
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Decode AlertManager secret
+  ansible.builtin.set_fact:
+    cr_alert_manager_config: "{{ cr_am_secret_result.resources[0].data['alertmanager.yaml'] | b64decode | from_yaml }}"
+
+# get configured receivers (receivers with only the 'name' attribute is not configured)
+# ignoring any receivers with no name attribute
+- name: Parse receivers
+  loop: "{{ cr_alert_manager_config.receivers }}"
+  loop_control:
+    label: "{{ item.name if item.name is defined else 'NONAME' }}"  # just in case
+  when: (item.keys() | difference(['name']) | length) > 0
+  ansible.builtin.set_fact:
+    cr_receivers: "{{ cr_receivers + ([item.name] if item.name is defined else []) }}"
+
+# get routes with configured receiver
+- name: Get routes
+  loop: "{{ cr_alert_manager_config.route.routes }}"
+  when: item.receiver is in cr_receivers
+  ansible.builtin.set_fact:
+    cr_routes: "{{ cr_routes + [item.receiver] }}"
+
+- name: Report if no AlertManager receiver configured
+  when: (cr_receivers | length) == 0
+  vars:
+    _id: ALERT-01
+    _new_result: "no AlertManager receiver configured"
+  ansible.builtin.include_tasks: store-result.yaml
+
+# default receiver automatically receive all alerts from the cluster
+# cr_alert_manager_config.route.receiver specifies the name of the default receiver
+# default receiver does not need an entry in cr_alert_manager_config.route.routes
+- name: Report if alert notifications are not sent to external system
+  when:
+    - (cr_routes | length) == 0
+    - (cr_alert_manager_config.route.receiver not in cr_receivers)
+  vars:
+    _id: ALERT-02
+    _new_result: "alert notifications are not sent to external system"
+  ansible.builtin.include_tasks: store-result.yaml
+...

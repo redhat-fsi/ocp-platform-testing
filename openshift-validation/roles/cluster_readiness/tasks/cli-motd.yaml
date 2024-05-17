@@ -1,0 +1,22 @@
+---
+- name: Get motd ConfigMap
+  register: cr_get_configmap_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: motd
+    namespace: openshift
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if motd for cli is not configured
+  when: (cr_get_configmap_result.resources | length == 0 or
+         (cr_get_configmap_result.resources is defined and
+          cr_get_configmap_result.resources[0].data is not defined) or
+         (cr_get_configmap_result.resources is defined and
+          cr_get_configmap_result.resources[0].data is defined and
+          cr_get_configmap_result.resources[0].data.message is not defined))
+  vars:
+    _id: MOTD-01
+    _new_result: "motd for cli is not configured"
+  ansible.builtin.include_tasks: store-result.yaml
+...

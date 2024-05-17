@@ -1,5 +1,0 @@
----
-- name: store verification result
-  ansible.builtin.set_fact:
-    cr_verification_results: "{{ cr_verification_results + [_new_result] }}"
-...

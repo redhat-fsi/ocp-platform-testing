@@ -1,0 +1,19 @@
+{%- set insecure_routes = [] -%}
+{%- set insecure_edge_termination_policy = [] -%}
+{%- for route in _routes -%}
+  {%- set insecure_edge = true -%}
+  {%- if route.spec.tls is defined -%}
+    {%- if route.spec.tls.insecureEdgeTerminationPolicy is defined -%}
+      {%- if route.spec.tls.insecureEdgeTerminationPolicy in ["Redirect", "Disable", "None"] -%}
+        {%- set insecure_edge = false -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if insecure_edge and route.metadata.namespace not in _insecure_edge_termination_exclude_namespaces -%}
+      {%- set _ = insecure_edge_termination_policy.append(route.metadata.namespace + '/' + route.metadata.name) -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- set _ = insecure_routes.append(route.metadata.namespace + '/' + route.metadata.name) -%}
+  {%- endif -%}
+{%- endfor -%}
+insecure_routes: {{ insecure_routes }}
+insecure_edge_termination_policy: {{ insecure_edge_termination_policy }}

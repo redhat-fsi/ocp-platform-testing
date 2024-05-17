@@ -1,0 +1,31 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_not_running_machines: []
+
+- name: Get machine
+  register: cr_get_machine_result
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: Machine
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get machine status
+  loop: "{{ cr_get_machine_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: item.status.phase != "Running"
+  ansible.builtin.set_fact:
+    cr_not_running_machines: "{{ cr_not_running_machines | default([]) + [item.metadata.name] }}"
+
+- name: Report if one or more machines not in running state
+  when: (cr_not_running_machines | length) != 0
+  vars:
+    _id: MACHINE-01
+    _new_result: "the following machines are not in running state: {{ cr_not_running_machines | join(', ') }} "
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Store number of machines for used in nodes.yaml
+  ansible.builtin.set_fact:
+    cr_machine_count: "{{ cr_get_machine_result.resources | length }}"
+...

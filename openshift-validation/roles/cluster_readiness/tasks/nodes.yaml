@@ -1,0 +1,109 @@
+# this tasks list must run after machines.yaml
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    _cr_machine_count: "{{ 0 if cr_machine_count is not defined else (cr_machine_count | int) }}"  # just in case
+    cr_control_count: 0
+    cr_worker_count: 0
+    cr_not_ready_nodes: []
+
+- name: Get nodes
+  register: cr_get_node_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get node metrics
+  register: cr_get_node_metrics_result
+  kubernetes.core.k8s_info:
+    api_version: metrics.k8s.io/v1beta1
+    kind: NodeMetrics
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if number of machines and nodes is not equal
+  when: (_cr_machine_count | int) != (cr_get_node_result.resources | length | int)
+  vars:
+    _id: NODES-01
+    _new_result: "number of machines and nodes is not equal: [machines: {{ _cr_machine_count }}, nodes: {{ cr_get_node_result.resources | length }}]"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Parse nodes
+  loop: "{{ cr_get_node_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  ansible.builtin.set_fact:
+    cr_control_count: "{{ (cr_control_count | int) +
+                          (1 if ((item.metadata.labels.keys() | intersect(control_node_labels))) | length != 0 else 0) }}"
+    cr_worker_count: "{{ (cr_worker_count | int) +
+                         (1 if ((item.metadata.labels.keys() | intersect(worker_node_labels))) | length != 0 else 0) }}"
+    cr_not_ready_nodes: "{{ cr_not_ready_nodes +
+                            ([item.metadata.name] if (item.status.conditions | selectattr('type', '==', 'Ready'))[0].status != 'True' else []) }}"
+
+- name: Report if incorrect control nodes count
+  when: cr_control_count | int != control_nodes
+  vars:
+    _id: NODES-02
+    _new_result: "incorrect control nodes count: expecting {{ control_nodes }}, got {{ cr_control_count }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if incorrect worker nodes count
+  when: cr_worker_count | int != worker_nodes
+  vars:
+    _id: NODES-03
+    _new_result: "incorrect worker nodes count: expecting {{ worker_nodes }}, got {{ cr_worker_count }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if one or more nodes not in ready state
+  when: cr_not_ready_nodes | length != 0
+  vars:
+    _id: NODES-04
+    _new_result: "the following nodes are not in ready state: {{ cr_not_ready_nodes | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get list of unschedulable nodes
+  ansible.builtin.set_fact:
+    cordon_nodes: "{{ cr_get_node_result.resources | selectattr('spec.unschedulable', 'defined') |
+                                                     selectattr('spec.unschedulable', '==', true) |
+                                                     map(attribute='metadata.name') }}"
+
+- name: Report if one or more nodes are unschedulable
+  when: (cordon_nodes | length) > 0
+  vars:
+    _id: NODES-05
+    _new_result: "the following nodes are set as unschedulable: {{ cordon_nodes | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get scheduler
+  register: cr_get_scheduler_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Scheduler
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if control nodes are schedulable
+  when: cr_get_scheduler_result.resources[0].spec.mastersSchedulable | bool
+  vars:
+    _id: NODES-06
+    _new_result: "the control nodes are schedulable"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Parse node metrics
+  ansible.builtin.set_fact:
+    cr_usage_metrics: "{{ cr_get_node_metrics_result.resources | map(attribute='usage') }}"
+
+- name: Report if node metrics missing
+  when: (cr_get_node_result.resources | length) != (cr_get_node_metrics_result.resources | length)
+  vars:
+    _id: NODES-07
+    _new_result: "missing one or more nodes metrics"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if missing node cpu or memory metrics
+  when: ((cr_usage_metrics | selectattr('cpu', 'defined') | length) != (cr_get_node_result.resources | length) or
+         (cr_usage_metrics | selectattr('memory', 'defined') | length) != (cr_get_node_result.resources | length))
+  vars:
+    _id: NODES-08
+    _new_result: "missing node cpu and/or memory metrics"
+  ansible.builtin.include_tasks: store-result.yaml
+...

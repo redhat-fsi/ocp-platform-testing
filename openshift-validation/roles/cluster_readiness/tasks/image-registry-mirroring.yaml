@@ -1,0 +1,19 @@
+---
+- name: Only for openshift v4.13+
+  when: cluster_version is ansible.builtin.version("4.13", ">=")
+  block:
+    - name: Get ImageContentSourcePolicy
+      register: cr_get_icsp_result
+      kubernetes.core.k8s_info:
+        api_version: operator.openshift.io/v1alpha1
+        kind: ImageContentSourcePolicy
+        # kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: Report if ImageContentSourcePolicy is configured
+      when: (cr_get_icsp_result.resources | length) > 0
+      vars:
+        _id: ICSP-01
+        _new_result: "ImageContentSourcePolicy is deprecated since OpenShift v4.13: {{ cr_get_icsp_result.resources |
+                                                                                       map(attribute='metadata.name') | join(',') }}"
+      ansible.builtin.include_tasks: store-result.yaml
+...

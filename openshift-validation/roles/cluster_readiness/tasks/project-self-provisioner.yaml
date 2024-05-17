@@ -1,0 +1,30 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_self_prov_oauth: []
+
+- name: Get self-provisioners cluster role binding
+  register: cr_get_crb_result
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Retrieve cluster role binding with self-provisioner roleRef
+  ansible.builtin.set_fact:
+    cr_self_provisioner_cbr: "{{ cr_get_crb_result.resources | selectattr('roleRef.name', '==', 'self-provisioner') }}"
+
+- name: Retrieve self-provisioner roleRef with system:authenticated:oauth subject
+  loop: "{{ cr_self_provisioner_cbr }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  ansible.builtin.set_fact:
+    cr_self_prov_oauth: "{{ cr_self_prov_oauth + item.subjects | selectattr('name', '==', 'system:authenticated:oauth') }}"
+
+- name: Report if project self provisioner is enabled for authenticated user
+  when: (cr_self_prov_oauth | length) > 0
+  vars:
+    _id: PROV-01
+    _new_result: "project self provisioner is enabled for authenticated user"
+  ansible.builtin.include_tasks: store-result.yaml
+...

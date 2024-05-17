@@ -1,0 +1,128 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_verification_results: []
+    cr_all_completed: false
+    cr_working_namespace: "{{ working_namespace_prefix }}{{ lookup('password', '/dev/null chars=ascii_letters, length=5') | lower }}"
+
+- name: Block with always
+  block:
+    # for oc debug
+    - name: Create working namespace
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ cr_working_namespace }}"
+        state: present
+        # kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: OAuth server metadata
+      ansible.builtin.import_tasks: oauth-server-metadata.yaml
+
+    - name: ClusterVersion
+      ansible.builtin.import_tasks: cluster-version.yaml
+
+    - name: ClusterOperators
+      ansible.builtin.import_tasks: cluster-operators.yaml
+
+    - name: MachineConfigPool
+      ansible.builtin.import_tasks: machine-config-pools.yaml
+
+    - name: Machine
+      ansible.builtin.import_tasks: machines.yaml
+
+    - name: Nodes
+      ansible.builtin.import_tasks: nodes.yaml          # this task list must run after machines.yaml
+
+    - name: Infra nodes
+      ansible.builtin.import_tasks: infra-nodes.yaml
+
+    - name: CertificateSigningRequest
+      ansible.builtin.import_tasks: csr.yaml
+
+    - name: Wildcard dns and wildcard certificate
+      ansible.builtin.import_tasks: wildcard-dns.yaml
+
+    - name: CoreDNS
+      ansible.builtin.import_tasks: core-dns.yaml
+
+    - name: NTP verification
+      ansible.builtin.import_tasks: ntp.yaml
+
+    - name: Kubeadmin user
+      ansible.builtin.import_tasks: kubeadmin.yaml
+
+    - name: OAuth
+      ansible.builtin.import_tasks: oauth.yaml
+
+    - name: MOTD
+      ansible.builtin.import_tasks: cli-motd.yaml
+
+    - name: ETCD
+      ansible.builtin.import_tasks: etcd.yaml
+
+    - name: TlsSecurityProfile
+      ansible.builtin.include_tasks: tls-security-profile.yaml
+
+    - name: Secure OpenShift Routes
+      ansible.builtin.import_tasks: secure-routes.yaml
+
+    - name: Audit profile
+      ansible.builtin.import_tasks: audit.yaml
+
+    - name: Garbage collection KubeletConfig
+      ansible.builtin.import_tasks: garbage-collection.yaml
+
+    - name: Project self provisioner
+      ansible.builtin.import_tasks: project-self-provisioner.yaml
+
+    - name: Project request template
+      ansible.builtin.import_tasks: project-template.yaml
+
+    - name: StoregeClass
+      ansible.builtin.import_tasks: storage-classes.yaml
+
+    - name: OperatorHub
+      ansible.builtin.import_tasks: operator-hub.yaml
+
+    - name: Monitoring stack
+      ansible.builtin.import_tasks: monitoring.yaml
+
+    - name: Monitoring stack - AlertManager
+      ansible.builtin.import_tasks: alerting.yaml
+
+    - name: Logging stack
+      ansible.builtin.import_tasks: logging.yaml
+
+    - name: Image controller config
+      ansible.builtin.import_tasks: image-controller-config.yaml
+
+    - name: Image content source policy
+      ansible.builtin.import_tasks: image-registry-mirroring.yaml
+
+    - name: OpenShift image registry
+      ansible.builtin.import_tasks: internal-image-registry.yaml
+
+    - name: Pods
+      ansible.builtin.import_tasks: pods.yaml
+
+    - name: All validations completed, playbook did not crash
+      ansible.builtin.set_fact:
+        cr_all_completed: true
+
+  always:   # always clean up and display the report even if playbook did not run to completion
+    - name: Delete working namespace
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ cr_working_namespace }}"
+        state: absent
+        # kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: Display validation report
+      ansible.builtin.debug:
+        msg:
+          status: "{{ lookup('ansible.builtin.template', 'validation-status.j2') | trim }}"
+          error: "{{ 'validation did not complete.' if not cr_all_completed else omit }}"
+          findings: "{{ cr_verification_results if (cr_verification_results | length) != 0 else omit }}"
+...

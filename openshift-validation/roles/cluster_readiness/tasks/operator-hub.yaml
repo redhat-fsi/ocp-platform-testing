@@ -1,0 +1,117 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_non_ready_cs: []
+
+- name: Get OperatorHub config
+  register: cr_oh_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: OperatorHub
+    name: cluster
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get list of disabled default CatalogSources
+  ansible.builtin.set_fact:
+    disable_sources: "{{ cr_oh_result.resources[0].status.sources | selectattr('disabled', '==', true) | map(attribute='name') }}"
+
+- name: Report if default CatalogSources not disabled as specified
+  when: ((disable_default_catalog_sources | unique) | difference(disable_sources | unique) | length) != 0
+  vars:
+    _id: OH-01
+    _new_result: "default CatalogSources not disabled as specified: {{ (disable_default_catalog_sources |
+                                                                        unique) | difference(disable_sources | unique) | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get CatalogSource
+  register: cr_cs_result
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get PackageManifest
+  register: cr_pm_result
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse CatalogSource
+  loop: "{{ cr_cs_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: (item.status is not defined or
+         item.status.connectionState is not defined or
+         (item.status.connectionState is defined and
+          item.status.connectionState.lastObservedState is not defined) or
+         (item.status.connectionState is defined and
+          item.status.connectionState.lastObservedState is defined and
+          item.status.connectionState.lastObservedState != "READY"))
+  ansible.builtin.set_fact:
+    cr_non_ready_cs: "{{ cr_non_ready_cs + [item.metadata.namespace + '/' + item.metadata.name] }}"
+
+- name: Report if no CatalogSource configured
+  when: (cr_cs_result.resources | length) == 0
+  vars:
+    _id: OH-02
+    _new_result: "no CatalogSource configured"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if one or more CatalogSource are not in READY state
+  when:
+    - (cr_cs_result.resources | length) > 0
+    - (cr_non_ready_cs | length) != 0
+  vars:
+    _id: OH-03
+    _new_result: "one of more CatalogSources not in READY state: {{ cr_non_ready_cs | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if no PackageManifest
+  when:
+    - (cr_cs_result.resources | length) > 0
+    - (cr_non_ready_cs | length) == 0
+    - (cr_pm_result.resources | length) == 0
+  vars:
+    _id: OH-04
+    _new_result: "CatalogSource(s) configured, but no PackageManifest"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get ClusterServiceVersion
+  register: cr_csv_result
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse ClusterServiceVersion
+  vars:
+    _all_csv: "{{ cr_csv_result.resources }}"
+  ansible.builtin.set_fact:
+    cr_csv: "{{ lookup('ansible.builtin.template', 'csv.j2') }}"
+
+- name: Report if one or more ClusterServiceVersion not in Succeeded phase
+  when: (cr_csv | length) > 0
+  vars:
+    _id: OH-05
+    _new_result: "one or more ClusterServiceVersion not in Succeeded phase"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get InstallPlan
+  register: cr_ip_result
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse InstallPlan
+  ansible.builtin.set_fact:
+    cr_no_approval: "{{ cr_ip_result.resources | selectattr('spec.approved', '==', false) | map(attribute='metadata.name') }}"
+
+- name: Report if one or more InstallPlan not approved
+  when: (cr_no_approval | length) > 0
+  vars:
+    _id: OH-06
+    _new_result: "one or more InstallPlan not approved"
+  ansible.builtin.include_tasks: store-result.yaml
+...

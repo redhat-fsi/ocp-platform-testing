@@ -1,0 +1,74 @@
+---
+- name: Get ingress
+  register: cr_get_ingress_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Ingress
+    name: cluster
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get default ingress domain
+  ansible.builtin.set_fact:
+    cr_ingress_domain: "{{ cr_get_ingress_result.resources[0].spec.domain }}"
+
+- name: Report if ingress dns domain is not as specified
+  when: cr_ingress_domain != cluster_ingress_domain
+  vars:
+    _id: WDNS-01
+    _new_result: "the ingress domain is not as specified: expecting {{ cluster_ingress_domain }}, got {{ cr_ingress_domain }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Verify wild dns
+  ansible.builtin.set_fact:
+    cr_dns_result: "{{ lookup('community.general.dig',
+                              lookup('password', '/dev/null chars=ascii_letters, length=8') | lower + '.' + cr_ingress_domain + '.') }}"
+
+- name: Report if incorrect wildcard dns lookup
+  when: (cr_dns_result | split(',') | unique) != (ingress_ip | unique)
+  vars:
+    _id: WDNS-02
+    _new_result: "wildcard dns lookup did not resolve correctly"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get ingress controller default certificate name
+  register: cr_get_ingress_controller_result
+  kubernetes.core.k8s_info:
+    api_version: operator.openshift.io/v1
+    kind: IngressController
+    name: default
+    namespace: openshift-ingress-operator
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Determine default ingress certification secret
+  ansible.builtin.set_fact:
+    cr_ingress_cert_secret: "{{ cr_get_ingress_controller_result.resources[0].spec.defaultCertificate.name
+                                if cr_get_ingress_controller_result.resources[0].spec.defaultCertificate is defined
+                                else 'router-certs-default' }}"
+
+- name: Get ingress controller default certificate
+  register: cr_ingress_cert_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ cr_ingress_cert_secret }}"
+    namespace: openshift-ingress
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Decode ingress certificate
+  ansible.builtin.set_fact:
+    cr_ingress_cert: "{{ cr_ingress_cert_result.resources[0].data['tls.crt'] | b64decode | community.crypto.x509_certificate_info }}"
+
+- name: Report if default ingress certificate has incorrect subject alternative name
+  when: ('DNS:*.' + cr_ingress_domain) not in cr_ingress_cert.subject_alt_name
+  vars:
+    _id: WDNS-03
+    _new_result: "incorrect SAN on default ingress certificate"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if ingress router is using OpenShift self-signed certificate
+  when: cr_ingress_cert.issuer.commonName.startswith("ingress-operator")
+  vars:
+    _id: WDNS-04
+    _new_result: "ingress router is using OpenShift self-signed certificate"
+  ansible.builtin.include_tasks: store-result.yaml
+...

@@ -1,0 +1,135 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_control_nodes: []
+
+- name: Get etcd pods
+  register: cr_get_pod_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: openshift-etcd
+    label_selectors:
+      - app = etcd
+      - k8s-app = etcd
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Check etcd health status
+  register: cr_etcd_health_result
+  ignore_errors: true
+  kubernetes.core.k8s_exec:
+    namespace: openshift-etcd
+    pod: "{{ cr_get_pod_result.resources[0].metadata.name }}"
+    command: "etcdctl endpoint health --cluster --write-out=json"
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if etcd not healthy
+  when: (cr_etcd_health_result.rc != 0 or
+         (cr_etcd_health_result.rc == 0 and
+          (cr_etcd_health_result.stdout | from_json | selectattr('health', '==', true) | length) != (cr_etcd_health_result.stdout | from_json | length)))
+  vars:
+    _id: ETCD-01
+    _new_result: "etcd cluster is not healthy"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get nodes
+  register: cr_get_node_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get control plane nodes
+  loop: "{{ cr_get_node_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    cr_node_labels: "{{ item.metadata.labels.keys() | list }}"
+  when: ((cr_node_labels | intersect(control_node_labels)) | length) != 0
+  ansible.builtin.set_fact:
+    cr_control_nodes: "{{ cr_control_nodes + [item.metadata.name] }}"
+
+# using 'oc debug' directly is not ideal; need research for alternate method
+- name: Determine etcd disk performance
+  register: cr_etcd_perf_result
+  ignore_errors: true
+  # environment:
+  #   KUBECONFIG: "{{ kubeconfig_file }}"
+  changed_when: cr_etcd_perf_result.rc != 0
+  ansible.builtin.command: |
+    oc -n {{ cr_working_namespace }} debug node/{{ (cr_control_nodes | shuffle)[0] }} -- \
+      chroot /host \
+      /bin/bash -c "podman run --volume /var/lib/etcd:/var/lib/etcd:Z quay.io/openshift-scale/etcd-perf"
+
+- name: Report if disk not suitable for hosting etcd
+  when: (cr_etcd_perf_result.rc != 0 or
+         (cr_etcd_perf_result.rc == 0 and etcd_fsync_message not in cr_etcd_perf_result.stdout))
+  vars:
+    _id: ETCD-02
+    _new_result: "the disk not not suitable for hosting etcd"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get APIServer
+  register: cr_get_api_server_config_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: APIServer
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if etcd data is not encrypted
+  when: cr_get_api_server_config_result.resources[0].spec.encryption is not defined
+  vars:
+    _id: ETCD-03
+    _new_result: "etcd data is not encrypted"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if etcd data encryption type is not aes-gcm
+  when:
+    - cr_get_api_server_config_result.resources[0].spec.encryption is defined
+    - cr_get_api_server_config_result.resources[0].spec.encryption.type is defined
+    - cr_get_api_server_config_result.resources[0].spec.encryption.type != etc_encryption_type
+  vars:
+    _id: ETCD-04
+    _new_result: "etcd data encryption type is not {{ etc_encryption_type }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get etcd data encryption status
+  register: cr_get_encryption_result
+  loop:
+    - api_version: operator.openshift.io/v1
+      kind: OpenShiftAPIServer
+      name: cluster
+    - api_version: operator.openshift.io/v1
+      kind: KubeAPIServer
+      name: cluster
+    - api_version: operator.openshift.io/v1
+      kind: Authentication
+      name: cluster
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.api_version }}"
+    kind: "{{ item.kind }}"
+    name: "{{ item.name }}"
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse etcd data encryption status
+  loop: "{{ cr_get_encryption_result.results }}"
+  loop_control:
+    label: "{{ item.resources[0].kind }}"
+  ansible.builtin.set_fact:
+    cr_encryption_status: "{{ cr_encryption_status | default({}) |
+                              combine({item.resources[0].kind: (item.resources[0].status.conditions | selectattr('type', '==', 'Encrypted'))[0]}) }}"
+
+- name: Report if etcd data encryption is not completed
+  loop: "{{ lookup('ansible.builtin.dict', cr_encryption_status) }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - cr_get_api_server_config_result.resources[0].spec.encryption is defined
+    - cr_get_api_server_config_result.resources[0].spec.encryption.type is defined
+    - item.value.status | lower != "true"
+    - item.value.reason != 'EncryptionCompleted'
+  vars:
+    _id: ETCD-05
+    _new_result: "etcd data encryption not completed: {{ item.key }} -> {{ item.value.message }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

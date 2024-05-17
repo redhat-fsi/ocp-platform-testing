@@ -1,14 +1,14 @@
 # ansible-playbook cluster-capacity.yaml --extra-vars @settings.yaml
 #
 ---
-- name: "OpenShift: readiness check"
+- name: "OpenShift cluster capacity estimate"
   hosts: localhost
   connection: local
   gather_facts: false
   become: false
 
   tasks:
-    - name: estimate cluster capacity
+    - name: Estimate cluster capacity
       ansible.builtin.include_role:
-        name: cluster-capacity
+        name: cluster_capacity
 ...

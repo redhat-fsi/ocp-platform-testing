@@ -1,0 +1,23 @@
+---
+- name: Get ClusterVersion
+  register: cr_get_cv_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    name: version
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if ClusterVersion is not as specified
+  when: cr_get_cv_result.resources[0].status.history[0].version != cluster_version
+  vars:
+    _id: VER-01
+    _new_result: "ClusterVersion is not as specified: expecting {{ cluster_version }}, got {{ cr_get_cv_result.resources[0].status.history[0].version }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if ClusterVersion state is not Completed
+  when: cr_get_cv_result.resources[0].status.history[0].state != "Completed"
+  vars:
+    _id: VER-02
+    _new_result: "ClusterVersion state: expecting 'Completed', got '{{ cr_get_cv_result.resources[0].status.history[0].state }}'"
+  ansible.builtin.include_tasks: store-result.yaml
+...

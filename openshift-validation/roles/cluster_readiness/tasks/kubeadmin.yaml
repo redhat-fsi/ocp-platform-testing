@@ -1,0 +1,17 @@
+---
+- name: Get kubeadmin secret
+  register: cr_get_secret_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: kubeadmin
+    namespace: kube-system
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if kubeadmin user exist
+  when: (cr_get_secret_result.resources | length) != 0
+  vars:
+    _id: KUBEADMIN-01
+    _new_result: "kubeadmin user exist"
+  ansible.builtin.include_tasks: store-result.yaml
+...

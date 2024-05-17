@@ -1,0 +1,46 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_default_sc: []
+
+- name: Get storage classes
+  register: cr_get_sc_result
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse storage classes result
+  loop: "{{ cr_get_sc_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.metadata.annotations is defined
+    - '"storageclass.kubernetes.io/is-default-class" in item.metadata.annotations.keys()'
+    - item.metadata.annotations['storageclass.kubernetes.io/is-default-class'] == "true"
+  ansible.builtin.set_fact:
+    cr_default_sc: "{{ cr_default_sc | default([]) + [item.metadata.name] }}"
+
+- name: Report if more than one default storage classes
+  when: cr_default_sc | length > 1
+  vars:
+    _id: SC-01
+    _new_result: "more than one default storage classes configured: {{ cr_default_sc | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if no default storage classes
+  when: cr_default_sc | length == 0
+  vars:
+    _id: SC-02
+    _new_result: "no default storage class configured"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if default storage class is as specified
+  when:
+    - cr_default_sc | length == 1
+    - default_storage_class not in cr_default_sc
+  vars:
+    _id: SC-03
+    _new_result: "default storage class is not as specified"
+  ansible.builtin.include_tasks: store-result.yaml
+...

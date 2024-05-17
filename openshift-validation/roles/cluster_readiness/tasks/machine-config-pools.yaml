@@ -1,0 +1,40 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_mcp_node_selector: []
+
+- name: Get nodes
+  register: cr_get_node_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get MachineConfigPool
+  register: cr_mcp_result
+  kubernetes.core.k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: MachineConfigPool
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get list of MachineConfigPool nodeSelector
+  loop: "{{ cr_mcp_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  ansible.builtin.set_fact:
+    cr_mcp_node_selector: "{{ cr_mcp_node_selector + ((item.spec.nodeSelector.matchLabels).keys() | list) }}"
+
+- name: Get nodes with no associated MachineConfigPool
+  vars:
+    _nodes: "{{ cr_get_node_result.resources }}"
+    _mcp_node_selector: "{{ cr_mcp_node_selector }}"
+  ansible.builtin.set_fact:
+    cr_nodes_with_no_mcp: "{{ lookup('ansible.builtin.template', 'nodes-with-no-mcp.j2') }}"
+
+- name: Report if one or more node do not belong to MachineConfigPool
+  when: (cr_nodes_with_no_mcp | length) > 0
+  vars:
+    _id: MCP-01
+    _new_result: "one or more node do not belong to MachineConfigPool: {{ cr_nodes_with_no_mcp | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

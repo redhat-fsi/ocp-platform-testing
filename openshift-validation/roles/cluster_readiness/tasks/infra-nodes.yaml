@@ -1,0 +1,114 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_master_nodes: []
+    cr_worker_nodes: []
+    cr_infra_nodes: []
+
+- name: Get nodes
+  register: cr_get_node_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse nodes
+  loop: "{{ cr_get_node_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    cr_node_labels: "{{ item.metadata.labels.keys() | list }}"
+  ansible.builtin.set_fact:
+    cr_master_nodes: "{{ cr_master_nodes + ([item.metadata.name] if ((cr_node_labels | intersect(control_node_labels)) | length) != 0 else []) }}"
+    cr_worker_nodes: "{{ cr_worker_nodes + ([item.metadata.name] if ((cr_node_labels | intersect(worker_node_labels)) | length) != 0 else []) }}"
+    cr_infra_nodes: "{{ cr_infra_nodes + ([item.metadata.name] if ((cr_node_labels | intersect(infra_node_labels)) | length) != 0 else []) }}"
+
+- name: Report if no infra nodes defined
+  when: (cr_infra_nodes | length) == 0
+  vars:
+    _id: INFRA-01
+    _new_result: "no infra nodes defined"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if incorrect infra nodes count
+  when: (cr_infra_nodes | length) != infra_nodes
+  vars:
+    _id: INFRA-02
+    _new_result: "incorrent infra nodes count: expecting {{ infra_nodes }}, got {{ cr_infra_nodes | length }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if infra nodes also labeled as worker nodes
+  when: (cr_infra_nodes | intersect(cr_worker_nodes) | length) > 0
+  vars:
+    _id: INFRA-03
+    _new_result: "the following infra nodes are also labeled as worker nodes: {{ cr_infra_nodes | intersect(cr_worker_nodes) | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Only if there are infra nodes
+  when: (cr_infra_nodes | length) > 0
+  block:
+    - name: Get pods of interest
+      loop:
+        - openshift-ingress
+        - openshift-image-registry
+        - openshift-monitoring
+        - openshift-user-workload-monitoring
+        - openshift-logging
+        - rhacs-operator
+        - "{{ rhacs_namespace }}"
+        - openshift-gitops-operator
+        - openshift-gitops
+        - openshift-cnv
+        - istio-system
+      register: cr_get_pods_result
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ item }}"
+        # kubeconfig: "{{ kubeconfig_file }}"
+
+    - name: Parse pods
+      vars:
+        _all_pod: "{{ cr_get_pods_result.results | map(attribute='resources') | flatten }}"
+        _master_nodes: "{{ cr_master_nodes }}"
+        _infra_nodes: "{{ cr_infra_nodes }}"
+      ansible.builtin.set_fact:
+        bad_placement_pods: "{{ lookup('ansible.builtin.template', 'infra-pods-not-on-infra-nodes.j2') | from_yaml }}"
+
+    - name: Report if pods not on infra nodes
+      loop:
+        - name: openshift-ingress
+          id: INFRA-04
+          var: "{{ bad_placement_pods.ingress }}"
+        - name: openshift-image-registry
+          id: INFRA-05
+          var: "{{ bad_placement_pods.registry }}"
+        - name: openshift-monitoring
+          id: INFRA-06
+          var: "{{ bad_placement_pods.monitoring }}"
+        - name: openshift-user-workload-monitoring
+          id: INFRA-07
+          var: "{{ bad_placement_pods.user_monitoring }}"
+        - name: openshift-logging
+          id: INFRA-08
+          var: "{{ bad_placement_pods.logging }}"
+        - name: rhacs
+          id: INFRA-09
+          var: "{{ bad_placement_pods.rhacs }}"
+        - name: openshift-gitops
+          id: INFRA-10
+          var: "{{ bad_placement_pods.gitops }}"
+        - name: openshift-cnv
+          id: INFRA-11
+          var: "{{ bad_placement_pods.cnv }}"
+        - name: istio-system
+          id: INFRA-12
+          var: "{{ bad_placement_pods.istio }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: (item.var | length) > 0
+      vars:
+        _id: "{{ item.id }}"
+        _new_result: "the following {{ item.name }} pods not on infra nodes: {{ item.var | join(', ') }}"
+      ansible.builtin.include_tasks: store-result.yaml
+...

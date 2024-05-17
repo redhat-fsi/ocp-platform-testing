@@ -1,0 +1,116 @@
+---
+- name: Initialize variables
+  ansible.builtin.set_fact:
+    cr_mcp_labels: []
+    cr_kubletconfig_mcp_labels: []
+    cr_missing_gc_properties: {}
+
+- name: Get KubeletConfig
+  register: cr_kc_result
+  kubernetes.core.k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: KubeletConfig
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get MachineConfigPool
+  register: cr_mcp_result
+  kubernetes.core.k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: MachineConfigPool
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if no KubeletConfig
+  when: (cr_kc_result.resources | length) == 0
+  vars:
+    _id: GC-01
+    _new_result: "no KubeletConfig defined"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Parse MachineConfigPool
+  loop: "{{ cr_mcp_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  ansible.builtin.set_fact:
+    cr_mcp_labels: "{{ cr_mcp_labels + item.metadata.labels.keys() | list }}"
+
+- name: Report if KubeletConfig is not applied
+  loop: "{{ cr_kc_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.status.conditions[-1].type is defined
+    - item.status.conditions[-1].type != "Success"
+    - item.status.conditions[-1].status is defined
+    - item.status.conditions[-1].status != "True"
+  vars:
+    _id: GC-02
+    _new_result: "{{ item.metadata.name }} KubeletConfig not applied, no matching MachineConfigPool"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Parse KubeletConfig spec
+  loop: "{{ cr_kc_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.spec.kubeletConfig is defined
+  ansible.builtin.set_fact:
+    cr_kubletconfig_mcp_labels: "{{ cr_kubletconfig_mcp_labels + (item.spec.machineConfigPoolSelector.matchLabels.keys() | list
+                                                                  if item.spec.machineConfigPoolSelector is defined and
+                                                                     item.spec.machineConfigPoolSelector.matchLabels is defined
+                                                                  else []) }}"
+    cr_missing_gc_properties: "{{ cr_missing_gc_properties | combine({item.metadata.name:
+                                                                      garbage_collection_config |
+                                                                      difference(item.spec.kubeletConfig.keys())}) }}"
+
+- name: Report if KubeletConfig's machineConfigPoolSelector has matching MachineConfigPool
+  when: (cr_kubletconfig_mcp_labels | difference(cr_mcp_labels) | length) != 0
+  vars:
+    _id: GC-03
+    _new_result: "KubeletConfig machineConfigPoolSelector has no matching MachineConfigPool: {{ cr_kubletconfig_mcp_labels |
+                                                                                                difference(cr_mcp_labels) | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if any KubeletConfig garbage collection properties are not undefined
+  loop: "{{ cr_missing_gc_properties | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    _id: GC-04
+    _new_result: "{{ item.key }} KubeletConfig missing the following garbage collection properties: {{ item.value | join(', ') }}"
+  when: (item.value | length) > 0
+  ansible.builtin.include_tasks: store-result.yaml
+...
+
+# cat << EOF | oc apply -f -
+# apiVersion: machineconfiguration.openshift.io/v1
+# kind: KubeletConfig
+# metadata:
+#   name: worker-kubeconfig
+# spec:
+#   machineConfigPoolSelector:
+#     matchLabels:
+#       pools.operator.machineconfiguration.openshift.io/worker1: ""
+#   kubeletConfig:
+#     evictionSoft:
+#       memory.available: "500Mi"
+#       nodefs.available: "10%"
+#       nodefs.inodesFree: "5%"
+#       imagefs.available: "15%"
+#       imagefs.inodesFree: "10%"
+#     evictionSoftGracePeriod:
+#       memory.available: "1m30s"
+#       nodefs.available: "1m30s"
+#       nodefs.inodesFree: "1m30s"
+#       imagefs.available: "1m30s"
+#       imagefs.inodesFree: "1m30s"
+#     evictionHard:
+#       memory.available: "200Mi"
+#       nodefs.available: "5%"
+#       nodefs.inodesFree: "4%"
+#       imagefs.available: "10%"
+#       imagefs.inodesFree: "5%"
+#     evictionPressureTransitionPeriod: 0s
+#     imageMinimumGCAge: 5m
+#     imageGCHighThresholdPercent: 80
+#     imageGCLowThresholdPercent: 75
+# EOF

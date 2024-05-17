@@ -1,0 +1,59 @@
+---
+- name: Get storage classes
+  register: ar_get_sc_result
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse storage classes result
+  loop: "{{ ar_get_sc_result.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.metadata.annotations is defined
+    - '"storageclass.kubernetes.io/is-default-class" in item.metadata.annotations.keys()'
+    - item.metadata.annotations['storageclass.kubernetes.io/is-default-class'] == "true"
+  ansible.builtin.set_fact:
+    ar_default_storage_classes: "{{ ar_default_storage_classes | default([]) + [item.metadata.name] }}"
+
+- name: Get openshift-ingress namespace
+  register: ar_get_ingress_ns_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: openshift-ingress
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+# select labels with 'policy-group' in the key
+- name: Parse namespace labels
+  ansible.builtin.set_fact:
+    ar_ns_labels: "{{ ar_get_ingress_ns_result.resources[0].metadata.labels | dict2items() | selectattr('key', 'search', 'policy-group') }}"
+
+- name: Set namespaceSelector for network policy
+  ansible.builtin.set_fact:
+    ar_namespace_selector: "{{ dict(ar_ns_labels | map(attribute='key') | zip(ar_ns_labels | map(attribute='value'))) }}"
+
+# just in case playbook is run back-to-back
+- name: Ensure namespace does not exist or not in Terminating state
+  register: ar_ns_result
+  until: ((ar_ns_result.resources | length) == 0 or
+          ((ar_ns_result.resources | length) != 0 and (ar_ns_result.resources[0].status.phase != "Terminating")))
+  delay: 3
+  retries: 18
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: "{{ ar_app_namespace }}"
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Set resources to create
+  ansible.builtin.set_fact:
+    ar_templates:
+      - stateful-app/secret.yaml.j2
+      - stateful-app/network-policy.yaml.j2
+      - stateful-app/service.yaml.j2
+      - stateful-app/route.yaml.j2
+      - stateful-app/statefulset.yaml.j2
+      - stateful-app/deployment.yaml.j2
+...

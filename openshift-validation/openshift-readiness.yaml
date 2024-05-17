@@ -1,14 +1,14 @@
 # ansible-playbook openshift-readiness.yaml --extra-vars @settings.yaml
 #
 ---
-- name: "OpenShift: readiness check"
+- name: "OpenShift cluster readiness check"
   hosts: localhost
   connection: local
   gather_facts: false
   become: false
 
   tasks:
-    - name: verify cluster
+    - name: Verify cluster
       ansible.builtin.include_role:
-        name: cluster-readiness
+        name: cluster_readiness
 ...

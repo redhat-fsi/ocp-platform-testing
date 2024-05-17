@@ -1,0 +1,18 @@
+---
+- name: Get APIServer
+  register: cr_get_api_server_config_result
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: APIServer
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Report if audit profile is not set correctly
+  when: cr_get_api_server_config_result.resources[0].spec.audit.profile not in acceptable_audit_profiles
+  vars:
+    _id: AUDIT-01
+    _new_result: >
+      audit profile is not set correctly:
+      expecting one of [{{ acceptable_audit_profiles | join(', ') }}],
+      got {{ cr_get_api_server_config_result.resources[0].spec.audit.profile }}
+  ansible.builtin.include_tasks: store-result.yaml
+...

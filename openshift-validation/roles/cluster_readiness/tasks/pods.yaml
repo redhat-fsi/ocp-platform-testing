@@ -1,0 +1,78 @@
+---
+- name: Get all pods
+  register: cr_get_pod_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse pods
+  vars:
+    _all_pods: "{{ cr_get_pod_result.resources }}"
+    _forbidden_ns: "{{ forbidden_namespaces }}"
+  ansible.builtin.set_fact:
+    cr_incorrect_state_pods: "{{ lookup('ansible.builtin.template', 'parse-pods.j2') }}"
+    cr_pods_with_many_restarts: "{{ lookup('ansible.builtin.template', 'pod-restarts.j2') }}"
+
+- name: Report if one or more pods not in Running/Completed state
+  when: (cr_incorrect_state_pods.bad_pods | length) > 0
+  vars:
+    _id: PODS-01
+    _new_result: "some pods not in Running/Completed state: {{ cr_incorrect_state_pods.bad_pods | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if pods in forbidden namespaces
+  when: (cr_incorrect_state_pods.forbidden_ns_pods | length) > 0
+  vars:
+    _id: PODS-02
+    _new_result: "pods in [{{ forbidden_namespaces | join(', ') }}] namespaces: {{ cr_incorrect_state_pods.forbidden_ns_pods | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report pod with too many restarts ({{ pod_too_many_restarts }})
+  when: (cr_pods_with_many_restarts | length) != 0
+  vars:
+    _id: PODS-03
+    _new_result: "pod with too many restarts ({{ pod_too_many_restarts }}): {{ cr_pods_with_many_restarts | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Get kube-apiserver pods
+  register: cr_get_pod_result
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: openshift-etcd   # can be any namespace with pod, ideally namespace with stable pods
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Get kube-apiserver pods metrics
+  register: cr_get_pod_metrics_result
+  kubernetes.core.k8s_info:
+    api_version: metrics.k8s.io/v1beta1
+    kind: PodMetrics
+    namespace: openshift-etcd   # can be any namespace with pod, ideally namespace with stable pods
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse pod metrics
+  ansible.builtin.set_fact:
+    # only need containers in running state
+    cr_running_container: "{{ cr_get_pod_result.resources | map(attribute='status.containerStatuses') | flatten |
+                              selectattr('state.running', 'defined') | map(attribute='name') }}"
+    # the podMetrics api reports metrics for all running container, including the infra/pause container
+    # exclude the infra/pause container
+    cr_usage_metrics: "{{ cr_get_pod_metrics_result.resources | map(attribute='containers') | flatten |
+                          selectattr('name', '!=', 'POD') | map(attribute='usage') }}"
+
+- name: Report if pod metrics missing
+  when: (cr_running_container | length) != (cr_usage_metrics | length)
+  vars:
+    _id: PODS-04
+    _new_result: "missing one or more pods (containers) metrics"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if missing pod cpu or memory metrics
+  when: ((cr_usage_metrics | selectattr('cpu', 'defined') | length) != (cr_running_container | length) or
+         (cr_usage_metrics | selectattr('memory', 'defined') | length) != (cr_running_container | length))
+  vars:
+    _id: PODS-05
+    _new_result: "missing pod cpu and/or memory metrics"
+  ansible.builtin.include_tasks: store-result.yaml
+...

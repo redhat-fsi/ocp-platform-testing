@@ -1,0 +1,29 @@
+---
+- name: Get routes
+  register: cr_get_routes_result
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    # kubeconfig: "{{ kubeconfig_file }}"
+
+- name: Parse routes
+  vars:
+    _routes: "{{ cr_get_routes_result.resources }}"
+    _insecure_edge_termination_exclude_namespaces: "{{ insecure_edge_termination_exclude_namespaces }}"
+  ansible.builtin.set_fact:
+    cr_routes: "{{ lookup('ansible.builtin.template', 'parse-routes.j2') | from_yaml }}"
+
+- name: Report if one or more routes are insecure
+  when: (cr_routes.insecure_routes | length) > 0
+  vars:
+    _id: ROUTE-01
+    _new_result: "some routes are not secured: {{ cr_routes.insecure_routes | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if one or more routes set insecureEdgeTerminationPolicy to Allow
+  when: (cr_routes.insecure_edge_termination_policy | length) > 0
+  vars:
+    _id: ROUTE-02
+    _new_result: "some routes set spec.tls.insecureEdgeTerminationPolicy to Allow: {{ cr_routes.insecure_edge_termination_policy | join(', ') }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

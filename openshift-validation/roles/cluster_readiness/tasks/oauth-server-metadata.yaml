@@ -1,0 +1,50 @@
+---
+# - name: Load kubeconfig
+#   ansible.builtin.set_fact:
+#     cr_kubeconfig: "{{ lookup('ansible.builtin.file', kubeconfig_file) | from_yaml }}"
+
+# - name: Parse current context
+#   ansible.builtin.set_fact:
+#     cr_current_context: "{{ cr_kubeconfig.contexts | selectattr('name', '==', cr_kubeconfig['current-context']) }}"
+
+# - name: Parse current cluster
+#   ansible.builtin.set_fact:
+#     cr_current_cluster: "{{ (cr_kubeconfig.clusters | selectattr('name', '==', cr_current_context[0].context.cluster))[0].cluster.server }}"
+
+- name: Get API server url
+  register: cr_api_server_url
+  ansible.builtin.command: oc whoami --show-server
+
+- name: Get oauth server metadata
+  register: cr_oauth_metadata
+  ignore_errors: true
+  ansible.builtin.uri:
+    url: "{{ cr_api_server_url.stdout }}/.well-known/oauth-authorization-server"
+    # url: "{{ cr_current_cluster }}/.well-known/oauth-authorization-server"
+    method: GET
+    validate_certs: false
+
+- name: Set expected oauth server metadata issuer
+  ansible.builtin.set_fact:
+    cr_expected_issuer: "{{ cr_api_server_url.stdout | replace('//api', '//oauth-openshift.apps') | replace(':6443', '') }}"
+    # cr_expected_issuer: "{{ cr_current_cluster | replace('//api', '//oauth-openshift.apps') | replace(':6443', '') }}"
+
+- name: Report if cannot get oauth server metadata or invalid metadata
+  when: (cr_oauth_metadata.status != 200 or
+         cr_oauth_metadata.json.issuer is not defined or
+         cr_oauth_metadata.json.authorization_endpoint is not defined or
+         cr_oauth_metadata.json.token_endpoint is not defined)
+  vars:
+    _id: OMETA-01
+    _new_result: "cannot get oauth server metadata or invalid metadata"
+  ansible.builtin.include_tasks: store-result.yaml
+
+- name: Report if oauth server issuer metadata is not as expected
+  when:
+    - cr_oauth_metadata.status == 200
+    - cr_oauth_metadata.json.issuer != cr_expected_issuer
+  vars:
+    _id: OMETA-02
+    _new_result: "incorrect oauth server issuer metadata: expecting {{ cr_expected_issuer }}, got {{ cr_oauth_metadata.json.issuer }}"
+  ansible.builtin.include_tasks: store-result.yaml
+...

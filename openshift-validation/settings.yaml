@@ -1,45 +1,17 @@
 ---
-kubeconfig_file: /home/bkhoo/.kube/config
+# kubeconfig_file: /home/bkhoo/.kube/config
 
-cluster_version: 4.15.10
+cluster_version: 4.15.11
 
-cluster_ingress_domain: apps.cluster-rgnhk.dynamic.redhatworkshops.io
+cluster_ingress_domain: apps.cluster-ttbng.dynamic.redhatworkshops.io
 ingress_ip:
-  - 150.240.143.110
+  - 150.240.143.122
 
 control_nodes: 3
 worker_nodes: 3
-infra_nodes: 0
+infra_nodes: 2
 
 default_storage_class: ocs-external-storagecluster-ceph-rbd
 
-# master_node_label: "node-role.kubernetes.io/master"
-# worker_node_label: "node-role.kubernetes.io/worker"
-# infra_node_label: "node-role.kubernetes.io/infra"
-
-# min_access_token_max_age_seconds: 1800       # playbook default
-# min_access_token_inactivity_timeout: 600     # playbook default
-
-# etc_encryption_type: aesgcm                  # playbook default
-
-# allowed_registries:                          # playbook default
-#   - quay.io
-#   - registry.redhat.io
-#   - registry.access.redhat.com
-#   - image-registry.openshift-image-registry.svc:5000
-
-# acceptable_audit_profiles:                   # playbook default
-#   - WriteRequestBodies
-#   - AllRequestBodies
-
-# project_template_objects:                    # playbook default
-#   - Project
-#   - LimitRange
-#   - ResourceQuota
-#   - NetworkPolicy
-
-# disable_default_catalog_sources:             # playbook default
-#   - community-operators
-
-# pod_too_many_restarts: 100                   # playbook default
+# refer to roles/cluster-readiness/defaults/main.yaml for other configurable parameters
 ...
