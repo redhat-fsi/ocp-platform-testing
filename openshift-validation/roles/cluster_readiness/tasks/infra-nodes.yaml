@@ -4,6 +4,7 @@
     cr_master_nodes: []
     cr_worker_nodes: []
     cr_infra_nodes: []
+    cr_infra_nodes_no_taint: []
 
 - name: Get nodes
   register: cr_get_node_result
@@ -47,8 +48,26 @@
 - name: Only if there are infra nodes
   when: (cr_infra_nodes | length) > 0
   block:
+    - name: Check infra nodes taints
+      loop: "{{ cr_get_node_result.resources }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+      when:
+        - item.metadata.name in cr_infra_nodes
+        - item.spec.taint is not defined
+      ansible.builtin.set_fact:
+        cr_infra_nodes_no_taint: "{{ cr_infra_nodes_no_taint + [item.metadata.name] }}"
+
+    - name: Report if infra nodes are not tainted
+      when: (cr_infra_nodes_no_taint | length) > 0
+      vars:
+        _id: INFRA-04
+        _new_result: "the following infra nodes are not tainted: {{ cr_infra_nodes_no_taint | join(', ') }}"
+      ansible.builtin.include_tasks: store-result.yaml
+
     - name: Get pods of interest
       loop:
+        - openshift-operators
         - openshift-ingress
         - openshift-image-registry
         - openshift-monitoring
@@ -60,6 +79,15 @@
         - openshift-gitops
         - openshift-cnv
         - istio-system
+        # - open-cluster-management
+        # - multicluster-engine
+        # - open-cluster-management-hub
+        # - hive
+        # - open-cluster-management-agent
+        # - open-cluster-management-agent-addon
+        # - open-cluster-management-global-set
+        # - hypershift
+        # - default-broker
       register: cr_get_pods_result
       kubernetes.core.k8s_info:
         api_version: v1
@@ -77,32 +105,35 @@
 
     - name: Report if pods not on infra nodes
       loop:
+        - name: openshift-operators
+          id: INFRA-05
+          var: "{{ bad_placement_pods.operators }}"
         - name: openshift-ingress
-          id: INFRA-04
+          id: INFRA-06
           var: "{{ bad_placement_pods.ingress }}"
         - name: openshift-image-registry
-          id: INFRA-05
+          id: INFRA-07
           var: "{{ bad_placement_pods.registry }}"
         - name: openshift-monitoring
-          id: INFRA-06
+          id: INFRA-08
           var: "{{ bad_placement_pods.monitoring }}"
         - name: openshift-user-workload-monitoring
-          id: INFRA-07
+          id: INFRA-09
           var: "{{ bad_placement_pods.user_monitoring }}"
         - name: openshift-logging
-          id: INFRA-08
+          id: INFRA-10
           var: "{{ bad_placement_pods.logging }}"
         - name: rhacs
-          id: INFRA-09
+          id: INFRA-11
           var: "{{ bad_placement_pods.rhacs }}"
         - name: openshift-gitops
-          id: INFRA-10
+          id: INFRA-12
           var: "{{ bad_placement_pods.gitops }}"
         - name: openshift-cnv
-          id: INFRA-11
+          id: INFRA-13
           var: "{{ bad_placement_pods.cnv }}"
         - name: istio-system
-          id: INFRA-12
+          id: INFRA-14
           var: "{{ bad_placement_pods.istio }}"
       loop_control:
         label: "{{ item.name }}"

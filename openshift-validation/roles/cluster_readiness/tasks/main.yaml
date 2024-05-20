@@ -79,7 +79,7 @@
     - name: Project request template
       ansible.builtin.import_tasks: project-template.yaml
 
-    - name: StoregeClass
+    - name: StorageClass
       ansible.builtin.import_tasks: storage-classes.yaml
 
     - name: OperatorHub

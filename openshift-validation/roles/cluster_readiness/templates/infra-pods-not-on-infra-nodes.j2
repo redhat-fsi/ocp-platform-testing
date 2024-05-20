@@ -1,3 +1,4 @@
+{%- set operator_pods = [] -%}
 {%- set ingress_pods = [] -%}
 {%- set registry_pods = [] -%}
 {%- set monitoring_pods = [] -%}
@@ -28,9 +29,12 @@
   {%- if not daemonset_pod and not master_node_pod and has_nodename -%}
     {# only if pod not on infra nodes #}
     {%- if pod.spec.nodeName not in _infra_nodes -%}
+      {# openshift-operators #}
+      {%- if pod.metadata.namespace == 'openshift-operators' -%}
+        {%- set _ = operator_pods.append(pod.metadata.name) -%}
 
       {# ingress router #}
-      {%- if pod.metadata.namespace == 'openshift-ingress' -%}
+      {%- elif pod.metadata.namespace == 'openshift-ingress' -%}
         {%- set _ = ingress_pods.append(pod.metadata.name) -%}
 
       {# image registy #}
@@ -61,7 +65,7 @@
       {%- elif pod.metadata.namespace == 'openshift-cnv' -%}
         {%- set _ = cnv_pods.append(pod.metadata.name) -%}
 
-      {# service_mesh #}
+      {# service mesh #}
       {%- elif pod.metadata.namespace in ['istio-system', 'openshift-distributed-tracing'] -%}
         {%- set _ = istio_pods.append(pod.metadata.name) -%}
 
@@ -70,6 +74,7 @@
   {%- endif -%}
 {%- endfor -%}
 
+operators: {{ operator_pods }}
 ingress: {{ ingress_pods }}
 registry: {{ registry_pods }}
 monitoring: {{ monitoring_pods }}

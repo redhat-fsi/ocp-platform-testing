@@ -13,6 +13,7 @@
 
 - name: Get API server url
   register: cr_api_server_url
+  changed_when: cr_api_server_url.rc != 0
   ansible.builtin.command: oc whoami --show-server
 
 - name: Get oauth server metadata

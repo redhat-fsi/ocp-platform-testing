@@ -93,7 +93,7 @@ IMPORTANT: replace `username` and API server URL.
 ----
 ansible-navigator run openshift-readiness.yaml \
   --extra-vars @settings.yaml \
-  --pull-policy missing \
+  --pull-policy missing --mode stdout \
   --execution-environment true \
   --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
   --set-environment-variable KUBECONFIG=/kube/config \
@@ -131,7 +131,7 @@ IMPORTANT: replace `username` and API server URL.
 [source,bash]
 ----
 ansible-navigator run application-readiness.yaml \
-  --pull-policy missing \
+  --pull-policy missing --mode stdout \
   --execution-environment true \
   --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
   --set-environment-variable KUBECONFIG=/kube/config \
@@ -159,7 +159,7 @@ IMPORTANT: replace `username` and API server URL.
 [source,bash]
 ----
 ansible-navigator run cluster-capacity.yaml \
-  --pull-policy missing \
+  --pull-policy missing --mode stdout \
   --execution-environment true \
   --execution-environment-image quay.io/bkhoo/ee-openshift-validation:1.0 \
   --set-environment-variable KUBECONFIG=/kube/config \
@@ -244,7 +244,7 @@ The link:./openshift-readiness.yaml[playbook] performs the following opinionated
 | verify cpu and memory metrics for nodes are collected.
 | link:https://docs.openshift.com/container-platform/latest/support/troubleshooting/verifying-node-health.html[documentation]
 
-.12+| link:./roles/cluster-readiness/tasks/infra-nodes.yaml[infra nodes]
+.14+| link:./roles/cluster-readiness/tasks/infra-nodes.yaml[infra nodes]
 | INFRA-01
 | verify infra nodes are defined
 | link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#creating-an-infra-node_post-install-cluster-tasks[documentation]
@@ -254,44 +254,52 @@ The link:./openshift-readiness.yaml[playbook] performs the following opinionated
 | link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
 
 | INFRA-03
-| verify infra nodes are not also labeled as wroker nodes
+| verify infra nodes are not also labeled as worker nodes
 | link:https://docs.openshift.com/container-platform/latest/installing/validating-an-installation.html#querying-the-status-of-cluster-nodes-using-the-cli_validating-an-installation[documentation]
 
 | INFRA-04
+| verify infra nodes are tainted
+| link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#binding-infra-node-workloads-using-taints-tolerations_post-install-cluster-tasks[documentation]
+
+| INFRA-05
+| verify openshift-operators pods are on infra nodes
+| link:https://docs.openshift.com/container-platform/4.15/rest_api/operatorhub_apis/subscription-operators-coreos-com-v1alpha1.html#spec-config[documentation]
+
+| INFRA-06
 | verify openshift ingress router pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-router_post-install-cluster-tasks[documentation]
 
-| INFRA-05
+| INFRA-07
 | verify openshift image registry pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-registry_post-install-cluster-tasks[documentation]
 
-| INFRA-06
+| INFRA-08
 | verify openshift monitoring pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/post_installation_configuration/cluster-tasks.html#infrastructure-moving-monitoring_post-install-cluster-tasks[documentation]
 
-| INFRA-07
+| INFRA-09
 | verify openshift user workload monitoring pods are on infra nodes
 | link:https://access.redhat.com/solutions/6826361[documentation]
 
-| INFRA-08
+| INFRA-10
 | verify openshift logging pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/observability/logging/scheduling_resources/logging-node-selectors.html#logging-node-selectors[documentation]
 link:https://docs.openshift.com/container-platform/latest/rest_api/operatorhub_apis/subscription-operators-coreos-com-v1alpha1.html#spec-config[documentation]
 
-| INFRA-09
+| INFRA-11
 | verify rhacs pods are on infra nodes
 | link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-central-config-options-ocp.html[documentation]
 link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-secured-cluster-config-options-ocp.html[documentation]
 
-| INFRA-10
+| INFRA-12
 | verify openshift gitops pods are on infra nodes
 | link:https://docs.openshift.com/gitops/latest/gitops_workloads_infranodes/running-gitops-control-plane-workloads-on-infrastructure-nodes.html[documentation]
 
-| INFRA-11
+| INFRA-13
 | verify openshift virtualization pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/virt/post_installation_configuration/virt-node-placement-virt-components.html[documentation]
 
-| INFRA-12
+| INFRA-14
 | verify openshift service mesh pods are on infra nodes
 | link:https://docs.openshift.com/container-platform/latest/service_mesh/v2x/ossm-create-smcp.html#ossm-config-control-plane-infrastructure-node-console_ossm-create-smcp[documentation]
 
@@ -436,15 +444,7 @@ link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-secure
 | link:https://www.redhat.com/en/blog/openshift-container-platform-4-how-does-machine-config-pool-work[documentation]
 
 | GC-04
-a| verify each KubeletConfig has the following properties:
-
-- evictionSoft
-- evictionHard
-- evictionSoftGracePeriod
-- imageGCLowThresholdPercent
-- imageGCHighThresholdPercent
-- evictionPressureTransitionPeriod
-- imageMinimumGCAge
+| verify each KubeletConfig has the following properties: `evictionSoft`, `evictionHard`, `evictionSoftGracePeriod`, `imageGCLowThresholdPercent`, `imageGCHighThresholdPercent`, `evictionPressureTransitionPeriod`, `imageMinimumGCAge`
 | link:https://docs.openshift.com/container-platform/latest/nodes/nodes/nodes-nodes-garbage-collection.html[documentation]
 
 | link:./roles/cluster-readiness/tasks/project-self-provisioner.yaml[project self provisioner]
@@ -637,5 +637,5 @@ The tool estimates the number of pods that can be scheduled on the cluster with 
 - infra workloads are deployed to infra nodes:
   * openshift pipelines
   * serverless
-  * pods on openshift-operators namespace
+  * advanced cluster management
 - logs are forwarded to external log aggregator.

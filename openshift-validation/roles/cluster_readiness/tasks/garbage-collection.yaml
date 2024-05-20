@@ -109,8 +109,8 @@
 #       nodefs.inodesFree: "4%"
 #       imagefs.available: "10%"
 #       imagefs.inodesFree: "5%"
-#     evictionPressureTransitionPeriod: 0s
-#     imageMinimumGCAge: 5m
+#     #evictionPressureTransitionPeriod: 0s
+#     #imageMinimumGCAge: 5m
 #     imageGCHighThresholdPercent: 80
 #     imageGCLowThresholdPercent: 75
 # EOF

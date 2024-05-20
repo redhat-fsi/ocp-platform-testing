@@ -3,9 +3,9 @@
 
 cluster_version: 4.15.11
 
-cluster_ingress_domain: apps.cluster-ttbng.dynamic.redhatworkshops.io
+cluster_ingress_domain: apps.cluster-x4dsp.dynamic.redhatworkshops.io
 ingress_ip:
-  - 150.240.143.122
+  - 150.240.143.41
 
 control_nodes: 3
 worker_nodes: 3
