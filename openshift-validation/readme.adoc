@@ -499,7 +499,7 @@ link:https://docs.openshift.com/acs/4.4/installing/installing_ocp/install-secure
 | verify all `InstallPlan` are approved.
 | link:https://docs.openshift.com/container-platform/latest/operators/understanding/olm/olm-understanding-olm.html#olm-installplan_olm-understanding-olm[documentation]
 
-.5+| link:./roles/cluster-readiness/tasks/monitoring.yaml[monitoring] and link:./roles/cluster-readiness/tasks/alerting.yaml[monitoring] stacks
+.5+| link:./roles/cluster-readiness/tasks/monitoring.yaml[monitoring] and link:./roles/cluster-readiness/tasks/alerting.yaml[alerting] stacks
 | MONITOR-01
 | verify user workload monitoring is enabled.
 | link:https://docs.openshift.com/container-platform/latest/observability/monitoring/enabling-monitoring-for-user-defined-projects.html[documentation]
